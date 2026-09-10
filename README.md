@@ -1,6 +1,6 @@
 # HMHarness CodexHost Adapter Backup
 
-[![English](https://img.shields.io/badge/README-English-blue)](#english) [![中文](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-red)](#%E4%B8%AD%E6%96%87) [![HMHarness](https://img.shields.io/badge/Friend%20link-HMHarness-2CA5E0)](https://github.com/swsgbl/hmharness) [![CodexHost](https://img.shields.io/badge/Friend%20link-CodexHost-111827)](https://github.com/BytePioneer-AI/codex-host)
+[![English](https://img.shields.io/badge/README-English-blue)](#english) [![中文](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-red)](#%E4%B8%AD%E6%96%87) [![HMHarness](https://img.shields.io/badge/Friend%20link-HMHarness-2CA5E0)](https://github.com/swsgbl/hmharness) [![CodexHost](https://img.shields.io/badge/Friend%20link-CodexHost-111827)](https://github.com/BytePioneer-AI/codex-host) [![AtomGit](https://img.shields.io/badge/Mirror-AtomGit-1677FF)](https://atomgit.com/hongfu/hmharness-codexhost-adapter)
 
 This repository is a bilingual, source-provenance backup of the working HMHarness integration for CodexHost. It preserves the adapter, bridge protocol, renderer integration, tests, and a clean patch that applies to upstream CodexHost.
 
@@ -76,6 +76,7 @@ See [LICENSE](LICENSE.md), [NOTICE.md](NOTICE.md), and the complete texts under 
 
 ### Friendly Links
 
+- [AtomGit mirror](https://atomgit.com/hongfu/hmharness-codexhost-adapter): synchronized bilingual backup for China-friendly access.
 - [HMHarness main repository](https://github.com/swsgbl/hmharness): self-evolving agent framework for the HarmonyOS development lifecycle.
 - [CodexHost](https://github.com/BytePioneer-AI/codex-host): multi-framework desktop host for AI coding agents.
 - [CodexHost Releases](https://github.com/BytePioneer-AI/codex-host/releases)
@@ -149,7 +150,7 @@ npx vitest run --config tests/vitest.config.js \
 
 ### 友情链接
 
+- [AtomGit 镜像](https://atomgit.com/hongfu/hmharness-codexhost-adapter)：与 GitHub 保持同步的双语备份。
 - [HMHarness 主仓库](https://github.com/swsgbl/hmharness)：面向鸿蒙开发全流程的自进化智能体框架。
 - [CodexHost 官方仓库](https://github.com/BytePioneer-AI/codex-host)：多框架 AI 编码智能体桌面宿主。
 - [CodexHost Releases](https://github.com/BytePioneer-AI/codex-host/releases)
-
