@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-10T15:23:08+08:00",
+  "codexHost": {
+    "upstream": "https://github.com/BytePioneer-AI/codex-host",
+    "baseCommit": "0b76b9de8c6f551506287d9a12905f9fdc860da2",
+    "verifiedLocalHead": "4440ec8b1f61dd3a28c20fcaade0508774fd5f45",
+    "patch": "patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch",
+    "patchSha256": "1205973032047AFD02B96DAED76744BB5BD3EA75372BB14922885F6184BDF95C",
+    "patchAppliesCleanlyToBaseCommit": true,
+    "changedFiles": 29,
+    "insertions": 1562,
+    "deletions": 10
+  },
+  "hmharness": {
+    "upstream": "https://github.com/swsgbl/hmharness",
+    "repositoryCommit": "2af518413230ddd3b4914711a4c6515f31edc95a",
+    "bridgeSnapshot": "snapshots/hmharness/packages/codexhost-bridge",
+    "bridgeVersion": "0.2.0",
+    "bridgePackagePublishedOnNpm": false
+  },
+  "validation": {
+    "codexHostTypecheck": "passed",
+    "codexHostTargetedTests": "3 files / 170 tests passed",
+    "bridgeNodeTests": "2 tests passed",
+    "patchApplyCheck": "passed",
+    "runtimeSmoke": "completed thread and turn; bridge exited; UI thinking count 0"
+  }
+}
+

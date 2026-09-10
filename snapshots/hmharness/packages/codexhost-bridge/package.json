@@ -1,0 +1,25 @@
+{
+  "name": "@hmharness/codexhost-bridge",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Machine-readable hmharness bridge for CodexHost and other agent desktop hosts.",
+  "type": "module",
+  "bin": {
+    "hmh-codexhost": "./bin/hmh-codexhost.mjs"
+  },
+  "files": [
+    "bin"
+  ],
+  "dependencies": {
+    "@hmharness/agent": "0.2.0",
+    "@hmharness/kernel": "0.2.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swsgbl/hmharness.git"
+  }
+}

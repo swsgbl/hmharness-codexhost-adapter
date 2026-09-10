@@ -1,0 +1,2034 @@
+diff --git a/packages/adapters/hmharness/assets/icon.svg b/packages/adapters/hmharness/assets/icon.svg
+new file mode 100644
+index 0000000..9d8bfe9
+--- /dev/null
++++ b/packages/adapters/hmharness/assets/icon.svg
+@@ -0,0 +1,4 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
++  <rect width="32" height="32" rx="7" fill="#0b1e3a"/>
++  <path d="M9 22V10l7 8 7-8v12" fill="none" stroke="#4fd8eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
++</svg>
+diff --git a/packages/adapters/hmharness/manifest.json b/packages/adapters/hmharness/manifest.json
+new file mode 100644
+index 0000000..fbb237f
+--- /dev/null
++++ b/packages/adapters/hmharness/manifest.json
+@@ -0,0 +1,13 @@
++{
++  "manifestVersion": 1,
++  "id": "hmharness",
++  "name": "HMHarness",
++  "version": "0.0.0",
++  "adapterApiVersion": 1,
++  "entry": "./dist/plugin.js",
++  "icon": "./assets/icon.svg",
++  "links": {
++    "documentation": "https://swsgbl.github.io/hmharness/",
++    "installation": "https://www.npmjs.com/package/@hmharness/cli"
++  }
++}
+diff --git a/packages/adapters/hmharness/package.json b/packages/adapters/hmharness/package.json
+new file mode 100644
+index 0000000..0139887
+--- /dev/null
++++ b/packages/adapters/hmharness/package.json
+@@ -0,0 +1,30 @@
++{
++  "name": "@codexhost/adapter-hmharness",
++  "version": "0.0.0",
++  "private": true,
++  "type": "module",
++  "files": [
++    "dist",
++    "manifest.json",
++    "assets"
++  ],
++  "exports": {
++    "./plugin": {
++      "types": "./dist/plugin.d.ts",
++      "import": "./dist/plugin.js"
++    },
++    ".": {
++      "types": "./dist/index.d.ts",
++      "import": "./dist/index.js"
++    }
++  },
++  "scripts": {
++    "build": "tsc -b",
++    "test": "vitest run test"
++  },
++  "dependencies": {
++    "@codexhost/harness-adapter": "0.0.0",
++    "@codexhost/harness-discovery": "0.0.0",
++    "@codexhost/shared-contracts": "0.0.0"
++  }
++}
+diff --git a/packages/adapters/hmharness/src/command.ts b/packages/adapters/hmharness/src/command.ts
+new file mode 100644
+index 0000000..004f6de
+--- /dev/null
++++ b/packages/adapters/hmharness/src/command.ts
+@@ -0,0 +1,48 @@
++import path from "node:path";
++
++import {
++  resolveHarnessExecutable,
++  targetPath,
++  VERSION_MANAGER_ROOTS,
++  type HarnessDiscoverySpec,
++} from "@codexhost/harness-discovery";
++
++export const hmHarnessDiscoverySpec: HarnessDiscoverySpec = {
++  id: "hmharness",
++  command: "hmh-codexhost",
++  commandEnvironmentVariable: "CODEXHOST_HMHARNESS_COMMAND",
++  installRoots: {
++    posix: [
++      "~/.npm-global/bin",
++      "~/.local/bin",
++      VERSION_MANAGER_ROOTS,
++      "/opt/homebrew/bin",
++      "/usr/local/bin",
++    ],
++    windows: ["${APPDATA}/npm", "~/.local/bin", VERSION_MANAGER_ROOTS],
++  },
++};
++
++export function resolveHmHarnessExecutable(
++  input: {
++    command?: string;
++    environment?: NodeJS.ProcessEnv;
++    homeDirectory?: string;
++    platform?: NodeJS.Platform;
++  } = {},
++): string | undefined {
++  const platform = input.platform ?? process.platform;
++  const resolution = resolveHarnessExecutable(
++    hmHarnessDiscoverySpec,
++    {
++      ...(input.command ? { command: input.command } : {}),
++      environment: input.environment ?? process.env,
++      ...(input.homeDirectory ? { homeDirectory: input.homeDirectory } : {}),
++      platform,
++    },
++  );
++  if (!resolution) return undefined;
++  return targetPath(platform).isAbsolute(resolution.executable)
++    ? resolution.executable
++    : path.resolve(resolution.executable);
++}
+diff --git a/packages/adapters/hmharness/src/hmharness-adapter.ts b/packages/adapters/hmharness/src/hmharness-adapter.ts
+new file mode 100644
+index 0000000..503e1dd
+--- /dev/null
++++ b/packages/adapters/hmharness/src/hmharness-adapter.ts
+@@ -0,0 +1,805 @@
++import { spawn, spawnSync } from "node:child_process";
++import { randomUUID } from "node:crypto";
++import path from "node:path";
++
++import {
++  HarnessOutputChannel,
++  type HarnessAdapter,
++  type HarnessError,
++  type HarnessInspection,
++  type HarnessModelRef,
++  type HarnessResult,
++  type HarnessSession,
++  type HarnessSessionCapabilities,
++  type HarnessSessionState,
++  type HarnessOutput,
++  type HostEvent,
++  type HostAgentMessageItem,
++  type HostCommand,
++  type HostItemSnapshot,
++  type HostThreadSnapshot,
++  type HostTurnSnapshot,
++  type InspectHarnessInput,
++  type InteractionRespondAccepted,
++  type InteractionRespondCommand,
++  type ModelSelectCompleted,
++  type ModelSelectCommand,
++  type OpenSessionInput,
++  type PermissionModeSelectCommand,
++  type PermissionModeSelectCompleted,
++  type ThinkingSelectCommand,
++  type ThinkingSelectCompleted,
++  type TurnCancelAccepted,
++  type TurnCancelCommand,
++  type TurnCompletedEvent,
++  type TurnOutcome,
++  type TurnStartAccepted,
++  type TurnStartCommand,
++} from "@codexhost/harness-adapter";
++import { commandInvocation } from "@codexhost/harness-discovery";
++import {
++  harnessIdSchema,
++  hostItemIdSchema,
++  nativeSessionRefSchema,
++  nativeTurnRefSchema,
++  type HarnessId,
++  type NativeSessionRef,
++} from "@codexhost/shared-contracts";
++
++import { resolveHmHarnessExecutable } from "./command.js";
++import {
++  decodeHmHarnessModelRef,
++  normalizeHmHarnessModelCatalog,
++  parseHmHarnessProviderCatalog,
++} from "./model-catalog.js";
++
++const hmHarnessId = harnessIdSchema.parse("hmharness");
++const DEFAULT_BRIDGE_TIMEOUT_MS = 10_000;
++const DEFAULT_TURN_TIMEOUT_MS = 15 * 60_000;
++
++const HMHARNESS_CAPABILITIES: HarnessSessionCapabilities = {
++  configuration: {
++    selectModel: true,
++    selectThinkingOption: false,
++    selectPermissionMode: false,
++    permissionModeScope: "live",
++  },
++  history: { fork: false, forkAcrossCwd: false, rollbackLastTurn: false },
++};
++
++class HMHarnessBridgeError extends Error {
++  constructor(
++    message: string,
++    readonly harnessError: Omit<HarnessError, "message"> & { message: string },
++  ) {
++    super(message);
++    this.name = "HMHarnessBridgeError";
++  }
++}
++
++export interface HMHarnessBridgeResult {
++  readonly stdout: string;
++  readonly stderr: string;
++  readonly exitCode: number | null;
++}
++
++export interface HMHarnessBridgeInput {
++  readonly executable: string;
++  readonly arguments: readonly string[];
++  readonly cwd: string;
++  readonly environment: NodeJS.ProcessEnv;
++  readonly stdin?: string;
++  readonly signal?: AbortSignal;
++  readonly timeoutMs: number;
++  /** Streaming hook: invoked per complete stdout line while the process runs. */
++  readonly onStdoutLine?: (line: string) => void;
++}
++
++export type HMHarnessBridgeRunner = (input: HMHarnessBridgeInput) => Promise<HMHarnessBridgeResult>;
++
++export interface HMHarnessAdapterOptions {
++  readonly command?: string;
++  readonly environment?: NodeJS.ProcessEnv;
++  readonly inspectTimeoutMs?: number;
++  readonly turnTimeoutMs?: number;
++}
++
++export interface HMHarnessAdapterDependencies {
++  readonly randomUUID?: () => string;
++  readonly runBridge?: HMHarnessBridgeRunner;
++}
++
++function errorMessage(error: unknown): string {
++  return error instanceof Error ? error.message : String(error);
++}
++
++function normalizeBridgeError(error: unknown, fallbackCode: HarnessError["code"]): HarnessError {
++  if (error instanceof HMHarnessBridgeError) return error.harnessError;
++  const message = errorMessage(error);
++  return {
++    code: /ENOENT|not (?:recognized|found)/iu.test(message) ? "notInstalled" : fallbackCode,
++    message,
++    retryable: fallbackCode === "unavailable" || fallbackCode === "nativeFailure",
++  };
++}
++
++function invalidState(message: string): HarnessError {
++  return { code: "invalidState", message, retryable: false };
++}
++
++function unsupported(message: string): HarnessError {
++  return { code: "unsupported", message, retryable: false };
++}
++
++function parseBridgeJson(stdout: string): Record<string, unknown> {
++  const line = stdout
++    .split(/\r?\n/u)
++    .map((entry) => entry.trim())
++    .filter(Boolean)
++    .at(-1);
++  if (!line) throw new HMHarnessBridgeError("HMHarness returned an empty result", {
++    code: "protocolError",
++    message: "HMHarness returned an empty result",
++    retryable: false,
++  });
++  try {
++    const parsed: unknown = JSON.parse(line);
++    if (typeof parsed !== "object" || parsed === null) throw new Error("invalid root");
++    return parsed as Record<string, unknown>;
++  } catch {
++    throw new HMHarnessBridgeError("HMHarness returned malformed JSON", {
++      code: "protocolError",
++      message: "HMHarness returned malformed JSON",
++      retryable: false,
++    });
++  }
++}
++
++async function processBridgeRunner(input: HMHarnessBridgeInput): Promise<HMHarnessBridgeResult> {
++  const invocation = commandInvocation(input.executable, input.arguments, input.environment);
++  return new Promise((resolve, reject) => {
++    const child = spawn(invocation.command, invocation.arguments, {
++      cwd: input.cwd,
++      env: input.environment,
++      stdio: ["pipe", "pipe", "pipe"],
++      windowsHide: true,
++      ...(invocation.windowsVerbatimArguments
++        ? { windowsVerbatimArguments: invocation.windowsVerbatimArguments }
++        : {}),
++    });
++    const stdout: Buffer[] = [];
++    const stderr: Buffer[] = [];
++    let stdoutTail = "";
++    let settled = false;
++    const cancel = (code: HarnessError["code"], message: string): void => {
++      if (settled) return;
++      settled = true;
++      clearTimeout(timer);
++      if (child.pid && process.platform === "win32") {
++        spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { windowsHide: true });
++      } else {
++        child.kill("SIGTERM");
++      }
++      reject(new HMHarnessBridgeError(message, { code, message, retryable: code !== "notInstalled" }));
++    };
++    const timer = setTimeout(
++      () => cancel("unavailable", `HMHarness command timed out after ${input.timeoutMs}ms`),
++      input.timeoutMs,
++    );
++    const abort = (): void =>
++      cancel("processExited", "HMHarness command was cancelled");
++    input.signal?.addEventListener("abort", abort, { once: true });
++    child.stdout?.on("data", (chunk: Buffer) => {
++      stdout.push(chunk);
++      if (!input.onStdoutLine) return;
++      // NDJSON: forward every complete line the moment it arrives; the last
++      // (possibly unterminated) line stays buffered and is handled at close.
++      stdoutTail += chunk.toString("utf8");
++      const lines = stdoutTail.split("\n");
++      stdoutTail = lines.pop() ?? "";
++      for (const line of lines) {
++        const trimmed = line.trim();
++        if (trimmed) {
++          if (trimmed.charCodeAt(0) === 123 && !/"type"\s*:/.test(trimmed)) armExitWatchdog();
++          input.onStdoutLine(trimmed);
++        }
++      }
++    });
++    let finalLineSeen = false;
++    let exitWatchdog: ReturnType<typeof setTimeout> | null = null;
++    const armExitWatchdog = (): void => {
++      if (finalLineSeen || !input.onStdoutLine) return;
++      finalLineSeen = true;
++      exitWatchdog = setTimeout(() => {
++        if (settled) return;
++        if (child.pid && process.platform === "win32") {
++          spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { windowsHide: true });
++        } else {
++          child.kill("SIGKILL");
++        }
++      }, 5_000);
++      exitWatchdog.unref?.();
++    };
++    child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk));
++    child.once("error", (error) => cancel("notInstalled", errorMessage(error)));
++    child.once("close", (exitCode) => {
++      if (settled) return;
++      settled = true;
++      clearTimeout(timer);
++      if (exitWatchdog) clearTimeout(exitWatchdog);
++      input.signal?.removeEventListener("abort", abort);
++      resolve({
++        stdout: Buffer.concat(stdout).toString("utf8"),
++        stderr: Buffer.concat(stderr).toString("utf8"),
++        exitCode,
++      });
++    });
++    child.stdin?.once("error", () => child.stdin?.destroy());
++    if (input.stdin === undefined) child.stdin?.end();
++    else child.stdin?.end(input.stdin);
++  });
++}
++
++function bridgeEnvironment(
++  environment: NodeJS.ProcessEnv,
++  cwd: string,
++  provider?: string,
++): NodeJS.ProcessEnv {
++  return {
++    ...environment,
++    HMH_DISABLE_MCP: "1",
++    HMH_QUIET: "1",
++    NO_COLOR: "1",
++    ...(provider ? { HMH_CHAT_PROVIDER: provider } : {}),
++    __CODEXHOST_HMHARNESS_CWD: cwd,
++  };
++}
++
++function stateFor(model: HarnessModelRef | undefined, nativeRef: NativeSessionRef): HarnessSessionState {
++  return {
++    nativeRef,
++    ...(model ? { effectiveModel: model } : {}),
++  };
++}
++
++function conversationPrompt(turns: readonly HostTurnSnapshot[], current: string): string {
++  if (turns.length === 0) return current;
++  const transcript = turns
++    .flatMap((turn) => {
++      const input = turn.input.map(({ text }) => `USER:\n${text}`).join("\n\n");
++      const output = turn.items
++        .map(({ item }) => (item.type === "agentMessage" ? `ASSISTANT:\n${item.text}` : null))
++        .filter((entry): entry is string => entry !== null)
++        .join("\n\n");
++      return [input, output].filter(Boolean).join("\n\n");
++    })
++    .join("\n\n---\n\n");
++  return [
++    "Continue this HMHarness conversation. Use the prior transcript only as context.",
++    "<prior_transcript>",
++    transcript,
++    "</prior_transcript>",
++    "<current_user_message>",
++    current,
++    "</current_user_message>",
++  ].join("\n\n");
++}
++
++interface ActiveTurn {
++  readonly command: TurnStartCommand;
++  readonly abort: AbortController;
++  completion: Promise<void>;
++}
++
++class HMHarnessSession implements HarnessSession {
++  readonly harnessId: HarnessId = hmHarnessId;
++  readonly capabilities = HMHARNESS_CAPABILITIES;
++  readonly initialState: HarnessSessionState;
++  readonly initialUsage = null;
++  readonly outputs: AsyncIterable<HarnessOutput>;
++  readonly #channel = new HarnessOutputChannel<HarnessOutput>();
++  readonly #adapter: HMHarnessAdapter;
++  readonly #bridge: HMHarnessBridgeRunner;
++  readonly #cwd: string;
++  readonly #environment: NodeJS.ProcessEnv;
++  readonly #executable: string;
++  readonly #uuid: () => string;
++  readonly #nativeRef: NativeSessionRef;
++  readonly #turnTimeoutMs: number;
++  readonly #onClosed: () => void;
++  #active: ActiveTurn | null = null;
++  #closed = false;
++  #closePromise: Promise<void> | null = null;
++  #model: HarnessModelRef | undefined;
++  #snapshot: HostThreadSnapshot;
++  #state: HarnessSessionState;
++
++  constructor(input: {
++    adapter: HMHarnessAdapter;
++    bridge: HMHarnessBridgeRunner;
++    cwd: string;
++    environment: NodeJS.ProcessEnv;
++    executable: string;
++    model?: HarnessModelRef;
++    randomUUID: () => string;
++    turnTimeoutMs: number;
++    onClosed: () => void;
++  }) {
++    this.#adapter = input.adapter;
++    this.#bridge = input.bridge;
++    this.#cwd = input.cwd;
++    this.#environment = input.environment;
++    this.#executable = input.executable;
++    this.#uuid = input.randomUUID;
++    this.#turnTimeoutMs = input.turnTimeoutMs;
++    this.#onClosed = input.onClosed;
++    this.#model = input.model;
++    this.#nativeRef = nativeSessionRefSchema.parse({
++      harnessId: hmHarnessId,
++      nativeSessionId: input.randomUUID(),
++      formatVersion: 1,
++    });
++    this.#state = stateFor(this.#model, this.#nativeRef);
++    this.initialState = this.#state;
++    this.#snapshot = { turns: [], state: this.#state };
++    this.outputs = this.#channel.outputs;
++  }
++
++  async readSnapshot(): Promise<HarnessResult<HostThreadSnapshot>> {
++    if (this.#closed) return { ok: false, error: invalidState("HMHarness Session is closed") };
++    return { ok: true, value: { ...this.#snapshot, state: this.#state } };
++  }
++
++  execute(command: TurnStartCommand): Promise<HarnessResult<TurnStartAccepted>>;
++  execute(command: TurnCancelCommand): Promise<HarnessResult<TurnCancelAccepted>>;
++  execute(command: InteractionRespondCommand): Promise<HarnessResult<InteractionRespondAccepted>>;
++  execute(command: ModelSelectCommand): Promise<HarnessResult<ModelSelectCompleted>>;
++  execute(command: ThinkingSelectCommand): Promise<HarnessResult<ThinkingSelectCompleted>>;
++  execute(
++    command: PermissionModeSelectCommand,
++  ): Promise<HarnessResult<PermissionModeSelectCompleted>>;
++  async execute(
++    command: HostCommand,
++  ): Promise<
++    HarnessResult<
++      | TurnStartAccepted
++      | TurnCancelAccepted
++      | InteractionRespondAccepted
++      | ModelSelectCompleted
++      | ThinkingSelectCompleted
++      | PermissionModeSelectCompleted
++    >
++  > {
++    if (this.#closed) return { ok: false, error: invalidState("HMHarness Session is closed") };
++    if (command.type === "turn.cancel") return this.#cancel(command);
++    if (command.type === "model.select") return this.#selectModel(command);
++    if (command.type === "thinking.select") {
++      return { ok: false, error: unsupported("HMHarness has no Thinking options") };
++    }
++    if (command.type === "permissionMode.select") {
++      return { ok: false, error: unsupported("HMHarness Permission Modes are not selectable") };
++    }
++    if (command.type === "interaction.respond") {
++      return { ok: false, error: unsupported("HMHarness one-shot turns have no Interactions") };
++    }
++    if (this.#active) {
++      return {
++        ok: false,
++        error: { code: "sessionBusy", message: "HMHarness Turn is active", retryable: true },
++      };
++    }
++    const text = command.input.map(({ text: part }) => part).join("\n");
++    if (!text.trim()) {
++      return {
++        ok: false,
++        error: { code: "invalidRequest", message: "HMHarness Turn must not be empty", retryable: false },
++      };
++    }
++    const active: ActiveTurn = {
++      command,
++      abort: new AbortController(),
++      completion: Promise.resolve(),
++    };
++    this.#active = active;
++    this.#event({ type: "turn.started", turnId: command.turnId });
++    active.completion = this.#runTurn(active, conversationPrompt(this.#snapshot.turns, text))
++      .catch(() => undefined)
++      .finally(() => {
++        if (this.#active === active) this.#active = null;
++      });
++    return { ok: true, value: { turnId: command.turnId } };
++  }
++
++  close(): Promise<void> {
++    this.#closePromise ??= this.#close();
++    return this.#closePromise;
++  }
++
++  async #close(): Promise<void> {
++    if (this.#closed) return;
++    this.#closed = true;
++    this.#active?.abort.abort();
++    await this.#active?.completion;
++    this.#channel.end();
++    this.#onClosed();
++  }
++
++  #cancel(command: TurnCancelCommand): HarnessResult<TurnCancelAccepted> {
++    const active = this.#active;
++    if (!active || active.command.turnId !== command.turnId) {
++      return { ok: false, error: invalidState("HMHarness cancellation has no active Turn") };
++    }
++    active.abort.abort();
++    return { ok: true, value: { cancellationRequested: true } };
++  }
++
++  #selectModel(command: ModelSelectCommand): HarnessResult<ModelSelectCompleted> {
++    if (this.#active) {
++      return { ok: false, error: { code: "sessionBusy", message: "HMHarness Turn is active", retryable: true } };
++    }
++    const native = decodeHmHarnessModelRef(command.model);
++    if (native.provider.includes("\u0000") || native.model.includes("\u0000")) {
++      return { ok: false, error: { code: "invalidRequest", message: "HMHarness Model is invalid", retryable: false } };
++    }
++    this.#model = command.model;
++    this.#state = stateFor(this.#model, this.#nativeRef);
++    this.#snapshot = { ...this.#snapshot, state: this.#state };
++    this.#event({ type: "session.state.changed", state: this.#state });
++    return { ok: true, value: { completed: true } };
++  }
++
++  async #runTurn(active: ActiveTurn, prompt: string): Promise<void> {
++    const nativeModel = this.#model ? decodeHmHarnessModelRef(this.#model) : undefined;
++    // Streaming state: the bridge emits NDJSON progress lines (type: "delta")
++    // while the agent loop runs and one final result object as the last line.
++    // Deltas stream into the UI as item.started + text.append; the final line
++    // remains the source of truth for the completed snapshot.
++    let streamItemId: ReturnType<typeof hostItemIdSchema.parse> | undefined;
++    let streamText = "";
++    const appendStreamDelta = (text: string): void => {
++      if (!text) return;
++      if (!streamItemId) {
++        streamItemId = hostItemIdSchema.parse(`hmharness-agent:${this.#uuid()}`);
++        this.#event({
++          type: "item.started",
++          turnId: active.command.turnId,
++          item: { type: "agentMessage", itemId: streamItemId, text },
++        });
++        streamText = text;
++        return;
++      }
++      streamText += text;
++      this.#event({
++        type: "item.updated",
++        turnId: active.command.turnId,
++        itemId: streamItemId,
++        update: { type: "text.append", text },
++      });
++    };
++    const handleStreamLine = (line: string): void => {
++      let parsed: unknown;
++      try {
++        parsed = JSON.parse(line);
++      } catch {
++        return; // non-JSON progress line (older bridge) - ignore
++      }
++      if (typeof parsed !== "object" || parsed === null) return;
++      const record = parsed as { type?: unknown; text?: unknown };
++      if (record.type === "delta" && typeof record.text === "string") {
++        appendStreamDelta(record.text);
++      }
++      // "line" / "tool" progress events carry no UI contract yet - dropped.
++    };
++    try {
++      const result = await this.#bridge({
++        executable: this.#executable,
++        arguments: ["run"],
++        cwd: this.#cwd,
++        environment: {
++          ...bridgeEnvironment(
++            this.#environment,
++            this.#cwd,
++            nativeModel?.provider,
++          ),
++          HMH_CODEXHOST_STREAM: "1",
++        },
++        stdin: prompt,
++        signal: active.abort.signal,
++        timeoutMs: this.#turnTimeoutMs,
++        onStdoutLine: handleStreamLine,
++      });
++      if (result.exitCode !== 0) {
++        throw new HMHarnessBridgeError(
++          `HMHarness command failed with exit code ${result.exitCode ?? "signal"}`,
++          {
++            code: "nativeFailure",
++            message: `HMHarness command failed with exit code ${result.exitCode ?? "signal"}`,
++            retryable: true,
++            ...(result.stderr ? { stderrTail: result.stderr.slice(-4000) } : {}),
++          },
++        );
++      }
++      const parsed = parseBridgeJson(result.stdout);
++      if (typeof parsed.text !== "string") {
++        throw new HMHarnessBridgeError("HMHarness result has no text", {
++          code: "protocolError",
++          message: "HMHarness result has no text",
++          retryable: false,
++        });
++      }
++      this.#succeedTurn(active, parsed.text, streamItemId, streamText);
++    } catch (error) {
++      const normalized = normalizeBridgeError(error, "nativeFailure");
++      this.#failOrCancelTurn(active, normalized, streamItemId, streamText);
++    }
++  }
++
++  #succeedTurn(
++    active: ActiveTurn,
++    text: string,
++    streamItemId?: ReturnType<typeof hostItemIdSchema.parse>,
++    streamText?: string,
++  ): void {
++    // When the final text extends the streamed text exactly, keep the one
++    // streamed item; otherwise emit a fresh final item (the UI replaces it).
++    if (streamItemId !== undefined && text === (streamText ?? "\u0000")) {
++      const item: HostAgentMessageItem = { type: "agentMessage", itemId: streamItemId, text };
++      const snapshot: HostItemSnapshot = { item, outcome: { status: "succeeded" } };
++      this.#event({
++        type: "item.completed",
++        turnId: active.command.turnId,
++        snapshot,
++      });
++      this.#completeTurn(active, { status: "succeeded" }, [snapshot]);
++      return;
++    }
++    if (streamItemId !== undefined) {
++      // The streamed item is the same logical message: close IT with the
++      // authoritative final text instead of opening a ghost duplicate and
++      // leaving the streamed one forever "in progress" (which read as the
++      // turn never finishing in the UI).
++      const closed: HostAgentMessageItem = { type: "agentMessage", itemId: streamItemId, text };
++      const closedSnapshot: HostItemSnapshot = { item: closed, outcome: { status: "succeeded" } };
++      this.#event({
++        type: "item.completed",
++        turnId: active.command.turnId,
++        snapshot: closedSnapshot,
++      });
++      this.#completeTurn(active, { status: "succeeded" }, [closedSnapshot]);
++      return;
++    }
++    const itemId = hostItemIdSchema.parse(`hmharness-agent:${this.#uuid()}`);
++    const item: HostAgentMessageItem = { type: "agentMessage", itemId, text };
++    this.#event({ type: "item.started", turnId: active.command.turnId, item });
++    const snapshot: HostItemSnapshot = { item, outcome: { status: "succeeded" } };
++    this.#event({
++      type: "item.completed",
++      turnId: active.command.turnId,
++      snapshot,
++    });
++    this.#completeTurn(active, { status: "succeeded" }, [snapshot]);
++  }
++
++  #failOrCancelTurn(
++    active: ActiveTurn,
++    error: HarnessError,
++    streamItemId?: ReturnType<typeof hostItemIdSchema.parse>,
++    streamText?: string,
++  ): void {
++    const cancelled = active.abort.signal.aborted;
++    // Close any streamed item so the UI is not left with a dangling bubble:
++    // partial text is preserved in the failed/cancelled snapshot.
++    if (streamItemId) {
++      const item: HostAgentMessageItem = {
++        type: "agentMessage",
++        itemId: streamItemId,
++        text: streamText ?? "",
++      };
++      const snapshot: HostItemSnapshot = {
++        item,
++        outcome: cancelled
++          ? { status: "cancelled", reason: "Cancelled by user" }
++          : { status: "failed", error },
++      };
++      this.#event({
++        type: "item.completed",
++        turnId: active.command.turnId,
++        snapshot,
++      });
++      this.#completeTurn(
++        active,
++        cancelled
++          ? { status: "cancelled", reason: "Cancelled by user" }
++          : { status: "failed", error },
++        [snapshot],
++      );
++      return;
++    }
++    this.#completeTurn(
++      active,
++      cancelled
++        ? { status: "cancelled", reason: "Cancelled by user" }
++        : { status: "failed", error },
++      [],
++    );
++  }
++
++  #completeTurn(
++    active: ActiveTurn,
++    outcome: TurnOutcome,
++    items: readonly HostItemSnapshot[],
++  ): void {
++    const nativeTurnRef = nativeTurnRefSchema.parse({
++      harnessId: hmHarnessId,
++      nativeSessionId: this.#nativeRef.nativeSessionId,
++      nativeTurnKey: `turn:${active.command.turnId}`,
++      formatVersion: 1,
++    });
++    const snapshot: HostTurnSnapshot = {
++      nativeTurnRef,
++      input: active.command.input,
++      items: [...items],
++      outcome:
++        outcome.status === "failed"
++          ? { status: "failed", error: outcome.error }
++          : outcome.status === "cancelled"
++            ? { status: "cancelled", ...(outcome.reason ? { reason: outcome.reason } : {}) }
++            : { status: "succeeded" },
++      ...(this.#model ? { model: this.#model } : {}),
++    };
++    this.#snapshot = { ...this.#snapshot, turns: [...this.#snapshot.turns, snapshot] };
++    const event: TurnCompletedEvent = {
++      type: "turn.completed",
++      turnId: active.command.turnId,
++      nativeTurnRef,
++      outcome,
++    };
++    this.#event(event);
++  }
++
++  #event(event: HostEvent): void {
++    this.#channel.emit({ kind: "event", event });
++  }
++}
++
++export class HMHarnessAdapter implements HarnessAdapter {
++  readonly harnessId: HarnessId = hmHarnessId;
++  readonly #options: HMHarnessAdapterOptions;
++  readonly #runBridge: HMHarnessBridgeRunner;
++  readonly #uuid: () => string;
++  readonly #sessions = new Set<HMHarnessSession>();
++  #closed = false;
++  #closePromise: Promise<void> | null = null;
++  #inspectionCache = new Map<string, HarnessInspection>();
++  #inspectionInFlight = new Map<string, Promise<HarnessInspection>>();
++
++  constructor(options: HMHarnessAdapterOptions = {}, dependencies: HMHarnessAdapterDependencies = {}) {
++    this.#options = options;
++    this.#runBridge = dependencies.runBridge ?? processBridgeRunner;
++    this.#uuid = dependencies.randomUUID ?? randomUUID;
++  }
++
++  async inspect(input: InspectHarnessInput = {}): Promise<HarnessInspection> {
++    if (this.#closed) return { status: "unavailable", error: invalidState("HMHarness Adapter is closed") };
++    const cwd = path.resolve(input.cwd ?? process.cwd());
++    if (!input.refresh) {
++      const cached = this.#inspectionCache.get(cwd);
++      if (cached) return cached;
++    }
++    const inFlight = this.#inspectionInFlight.get(cwd);
++    if (inFlight) return inFlight;
++    const inspection = this.#inspectCwd(cwd).finally(() => {
++      if (this.#inspectionInFlight.get(cwd) === inspection) this.#inspectionInFlight.delete(cwd);
++    });
++    this.#inspectionInFlight.set(cwd, inspection);
++    return inspection;
++  }
++
++  async #inspectCwd(cwd: string): Promise<HarnessInspection> {
++    const executable = resolveHmHarnessExecutable({
++      ...(this.#options.command ? { command: this.#options.command } : {}),
++      environment: this.#options.environment ?? process.env,
++    });
++    if (!executable) {
++      return {
++        status: "notInstalled",
++        error: {
++          code: "notInstalled",
++          message: "HMHarness bridge (hmh-codexhost) is not installed",
++          retryable: false,
++        },
++      };
++    }
++    try {
++      const result = await this.#runBridge({
++        executable,
++        arguments: ["providers", "--json"],
++        cwd,
++        environment: bridgeEnvironment(this.#options.environment ?? process.env, cwd),
++        timeoutMs: this.#options.inspectTimeoutMs ?? DEFAULT_BRIDGE_TIMEOUT_MS,
++      });
++      if (result.exitCode !== 0) {
++        throw new HMHarnessBridgeError("HMHarness provider inspection failed", {
++          code: "unavailable",
++          message: "HMHarness provider inspection failed",
++          retryable: true,
++          ...(result.stderr ? { stderrTail: result.stderr.slice(-4000) } : {}),
++        });
++      }
++      const inspection: HarnessInspection = {
++        status: "ready",
++        catalog: normalizeHmHarnessModelCatalog(parseHmHarnessProviderCatalog(result.stdout)),
++        capabilities: HMHARNESS_CAPABILITIES,
++      };
++      this.#inspectionCache.set(cwd, inspection);
++      return inspection;
++    } catch (error) {
++      return {
++        status: "error",
++        error: { ...normalizeBridgeError(error, "unavailable"), stage: "model-catalog" },
++      };
++    }
++  }
++
++  async open(input: OpenSessionInput): Promise<HarnessResult<HMHarnessSession>> {
++    if (this.#closed) return { ok: false, error: invalidState("HMHarness Adapter is closed") };
++    if (input.kind !== "create") {
++      return { ok: false, error: unsupported("HMHarness supports only fresh Sessions") };
++    }
++    const executable = resolveHmHarnessExecutable({
++      ...(this.#options.command ? { command: this.#options.command } : {}),
++      environment: this.#options.environment ?? process.env,
++    });
++    if (!executable) {
++      return {
++        ok: false,
++        error: {
++          code: "notInstalled",
++          message: "HMHarness bridge (hmh-codexhost) is not installed",
++          retryable: false,
++        },
++      };
++    }
++    if (input.model) {
++      const inspection = await this.inspect({ cwd: input.cwd });
++      if (inspection.status !== "ready" || !inspection.catalog.models.some(({ ref }) => ref.id === input.model?.id)) {
++        return {
++          ok: false,
++          error: {
++            code: "invalidRequest",
++            message: "Requested HMHarness Model is absent from its provider catalog",
++            retryable: false,
++          },
++        };
++      }
++    }
++    const session = new HMHarnessSession({
++      adapter: this,
++      bridge: this.#runBridge,
++      cwd: path.resolve(input.cwd),
++      environment: { ...(this.#options.environment ?? process.env), ...(input.environment ?? {}) },
++      executable,
++      ...(input.model ? { model: input.model } : {}),
++      randomUUID: this.#uuid,
++      turnTimeoutMs: this.#options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS,
++      onClosed: () => this.#sessionClosed(session),
++    });
++    this.#sessions.add(session);
++    return { ok: true, value: session };
++  }
++
++  close(): Promise<void> {
++    this.#closePromise ??= this.#close();
++    return this.#closePromise;
++  }
++
++  async #close(): Promise<void> {
++    if (this.#closed) return;
++    this.#closed = true;
++    await Promise.all([...this.#sessions].map((session) => session.close()));
++  }
++
++  #sessionClosed(session: HMHarnessSession): void {
++    this.#sessions.delete(session);
++  }
++}
+diff --git a/packages/adapters/hmharness/src/index.ts b/packages/adapters/hmharness/src/index.ts
+new file mode 100644
+index 0000000..5031892
+--- /dev/null
++++ b/packages/adapters/hmharness/src/index.ts
+@@ -0,0 +1,25 @@
++import { packageMetadata as harnessAdapter } from "@codexhost/harness-adapter";
++import { WORKSPACE_CONTRACT_VERSION } from "@codexhost/shared-contracts";
++
++export { HMHarnessAdapter } from "./hmharness-adapter.js";
++export type {
++  HMHarnessAdapterDependencies,
++  HMHarnessAdapterOptions,
++  HMHarnessBridgeResult,
++  HMHarnessBridgeRunner,
++} from "./hmharness-adapter.js";
++export { HMHARNESS_COMMAND_ENV } from "./plugin.js";
++export {
++  decodeHmHarnessModelRef,
++  encodeHmHarnessModelRef,
++  normalizeHmHarnessModelCatalog,
++  parseHmHarnessProviderCatalog,
++  type HmHarnessProvider,
++  type HmHarnessProviderCatalog,
++} from "./model-catalog.js";
++
++export const packageMetadata = {
++  name: "@codexhost/adapter-hmharness",
++  contractVersion: WORKSPACE_CONTRACT_VERSION,
++  adapterContract: harnessAdapter.name,
++} as const;
+diff --git a/packages/adapters/hmharness/src/model-catalog.ts b/packages/adapters/hmharness/src/model-catalog.ts
+new file mode 100644
+index 0000000..f9c94c1
+--- /dev/null
++++ b/packages/adapters/hmharness/src/model-catalog.ts
+@@ -0,0 +1,136 @@
++import { Buffer } from "node:buffer";
++
++import {
++  HARNESS_MODEL_REF_MAX_LENGTH,
++  harnessModelCatalogSchema,
++  harnessModelRefSchema,
++  type HarnessModelCatalog,
++  type HarnessModelRef,
++} from "@codexhost/shared-contracts";
++
++const MODEL_REF_PREFIX = "hmh-model-v1.";
++
++export interface HmHarnessProvider {
++  readonly name: string;
++  readonly model: string;
++  readonly purposes: readonly string[];
++}
++
++export interface HmHarnessProviderCatalog {
++  readonly chat: string | null;
++  readonly providers: readonly HmHarnessProvider[];
++}
++
++function text(value: unknown, label: string): string {
++  if (typeof value !== "string" || value.trim().length === 0) {
++    throw new Error(`HMHarness ${label} must not be empty`);
++  }
++  return value;
++}
++
++export function parseHmHarnessProviderCatalog(stdout: string): HmHarnessProviderCatalog {
++  const line = stdout
++    .split(/\r?\n/u)
++    .map((entry) => entry.trim())
++    .filter(Boolean)
++    .at(-1);
++  if (!line) throw new Error("HMHarness provider catalog is empty");
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(line);
++  } catch {
++    throw new Error("HMHarness provider catalog is not JSON");
++  }
++  if (typeof parsed !== "object" || parsed === null) {
++    throw new Error("HMHarness provider catalog has an invalid root");
++  }
++  const root = parsed as Record<string, unknown>;
++  const chat = root.chat === null || root.chat === undefined ? null : text(root.chat, "chat provider");
++  const providers = root.providers;
++  if (!Array.isArray(providers) || providers.length === 0) {
++    throw new Error("HMHarness provider catalog has no models");
++  }
++  return {
++    chat,
++    providers: providers.map((value) => {
++      if (typeof value !== "object" || value === null) {
++        throw new Error("HMHarness provider entry is invalid");
++      }
++      const provider = value as Record<string, unknown>;
++      return {
++        name: text(provider.name, "provider name"),
++        model: text(provider.model, "model"),
++        purposes: Array.isArray(provider.purposes)
++          ? provider.purposes.filter((purpose): purpose is string => typeof purpose === "string")
++          : [],
++      };
++    }),
++  };
++}
++
++export interface HmHarnessNativeModelRef {
++  readonly provider: string;
++  readonly model: string;
++}
++
++export function encodeHmHarnessModelRef(model: HmHarnessNativeModelRef): HarnessModelRef {
++  const provider = text(model.provider, "provider name");
++  const nativeModel = text(model.model, "model");
++  const encoded = Buffer.from(JSON.stringify([provider, nativeModel]), "utf8").toString("base64url");
++  const id = `${MODEL_REF_PREFIX}${encoded}`;
++  if (id.length > HARNESS_MODEL_REF_MAX_LENGTH) {
++    throw new Error("HMHarness Model identity is too long");
++  }
++  return harnessModelRefSchema.parse({ id });
++}
++
++export function decodeHmHarnessModelRef(ref: HarnessModelRef): HmHarnessNativeModelRef {
++  const parsed = harnessModelRefSchema.parse(ref);
++  if (!parsed.id.startsWith(MODEL_REF_PREFIX)) {
++    throw new Error("HMHarness Model Ref belongs to another Adapter");
++  }
++  let decoded: unknown;
++  try {
++    decoded = JSON.parse(
++      Buffer.from(parsed.id.slice(MODEL_REF_PREFIX.length), "base64url").toString("utf8"),
++    );
++  } catch {
++    throw new Error("HMHarness Model Ref is malformed");
++  }
++  if (
++    !Array.isArray(decoded) ||
++    decoded.length !== 2 ||
++    typeof decoded[0] !== "string" ||
++    typeof decoded[1] !== "string"
++  ) {
++    throw new Error("HMHarness Model Ref has an invalid native identity");
++  }
++  const native = { provider: decoded[0], model: decoded[1] };
++  if (encodeHmHarnessModelRef(native).id !== parsed.id) {
++    throw new Error("HMHarness Model Ref is not canonical");
++  }
++  return native;
++}
++
++export function normalizeHmHarnessModelCatalog(
++  catalog: HmHarnessProviderCatalog,
++): HarnessModelCatalog {
++  const models = [...catalog.providers]
++    .sort((left, right) => left.name.localeCompare(right.name) || left.model.localeCompare(right.model))
++    .map((provider) => ({
++      ref: encodeHmHarnessModelRef({ provider: provider.name, model: provider.model }),
++      label: `${provider.name} / ${provider.model}`,
++      resolvedModelLabel: provider.model,
++    }));
++  const refs = new Set(models.map(({ ref }) => ref.id));
++  if (refs.size !== models.length) throw new Error("HMHarness provider catalog contains duplicates");
++  const defaultModel =
++    catalog.chat === null
++      ? undefined
++      : models.find(({ label }) => label.startsWith(`${catalog.chat} / `))?.ref;
++  return harnessModelCatalogSchema.parse({
++    models,
++    ...(defaultModel ? { defaultModel } : {}),
++    thinkingOptions: [],
++  });
++}
+diff --git a/packages/adapters/hmharness/src/plugin.ts b/packages/adapters/hmharness/src/plugin.ts
+new file mode 100644
+index 0000000..7ef2efe
+--- /dev/null
++++ b/packages/adapters/hmharness/src/plugin.ts
+@@ -0,0 +1,15 @@
++import type { HarnessPluginContext } from "@codexhost/harness-adapter/plugin";
++
++import { HMHarnessAdapter } from "./hmharness-adapter.js";
++
++export const HMHARNESS_COMMAND_ENV = "CODEXHOST_HMHARNESS_COMMAND";
++
++export function createHarnessAdapter(context: HarnessPluginContext): HMHarnessAdapter {
++  const environment = { ...context.environment };
++  return new HMHarnessAdapter({
++    ...(environment[HMHARNESS_COMMAND_ENV]
++      ? { command: environment[HMHARNESS_COMMAND_ENV] }
++      : {}),
++    environment,
++  });
++}
+diff --git a/packages/adapters/hmharness/test/hmharness-adapter.test.ts b/packages/adapters/hmharness/test/hmharness-adapter.test.ts
+new file mode 100644
+index 0000000..fdef8d1
+--- /dev/null
++++ b/packages/adapters/hmharness/test/hmharness-adapter.test.ts
+@@ -0,0 +1,231 @@
++import { describe, expect, it } from "vitest";
++import { mkdtemp, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import path from "node:path";
++
++import { HMHarnessAdapter } from "../src/hmharness-adapter.js";
++import {
++  encodeHmHarnessModelRef,
++  normalizeHmHarnessModelCatalog,
++  parseHmHarnessProviderCatalog,
++} from "../src/model-catalog.js";
++import { hostItemIdSchema, hostTurnIdSchema } from "@codexhost/shared-contracts";
++import type { HarnessOutput } from "@codexhost/harness-adapter";
++import type { HMHarnessBridgeInput } from "../src/hmharness-adapter.js";
++
++const providerJson = `${JSON.stringify({
++  version: "0.2.0",
++  chat: "agnes",
++  providers: [
++    { name: "agnes", model: "agnes-model", purposes: ["chat"] },
++    { name: "omnifusion", model: "@quality", purposes: [] },
++  ],
++})}\n`;
++
++function model(provider: string, modelId: string) {
++  return encodeHmHarnessModelRef({ provider, model: modelId });
++}
++
++async function waitFor(predicate: () => boolean): Promise<void> {
++  for (let attempt = 0; attempt < 100 && !predicate(); attempt += 1) {
++    await new Promise((resolve) => setTimeout(resolve, 10));
++  }
++  expect(predicate()).toBe(true);
++}
++
++describe("HMHarness adapter", () => {
++  it("normalizes a credential-free provider catalog", () => {
++    const catalog = normalizeHmHarnessModelCatalog(parseHmHarnessProviderCatalog(providerJson));
++    expect(catalog.models.map(({ label }) => label)).toEqual([
++      "agnes / agnes-model",
++      "omnifusion / @quality",
++    ]);
++    expect(catalog.defaultModel?.id).toBe(model("agnes", "agnes-model").id);
++    expect(JSON.stringify(catalog)).not.toContain("apiKey");
++  });
++
++  it("runs a selected model and projects a completed turn", async () => {
++    const directory = await mkdtemp(path.join(tmpdir(), "hmharness-adapter-"));
++    const calls: HMHarnessBridgeInput[] = [];
++    const adapter = new HMHarnessAdapter(
++      { command: process.execPath, environment: { PATH: process.env.PATH } },
++      {
++        randomUUID: () => crypto.randomUUID(),
++        runBridge: async (input) => {
++          calls.push(input);
++          if (input.arguments.includes("providers")) {
++            return { stdout: providerJson, stderr: "", exitCode: 0 };
++          }
++          return {
++            stdout: `${JSON.stringify({ text: "HMH ready" })}\n`,
++            stderr: "",
++            exitCode: 0,
++          };
++        },
++      },
++    );
++    try {
++      const inspection = await adapter.inspect({ cwd: directory });
++      expect(inspection).toMatchObject({ status: "ready" });
++      const opened = await adapter.open({
++        kind: "create",
++        cwd: directory,
++        model: model("omnifusion", "@quality"),
++      });
++      expect(opened.ok).toBe(true);
++      if (!opened.ok) return;
++      const outputs: string[] = [];
++      const consumed = (async () => {
++        for await (const output of opened.value.outputs) {
++          if (output.kind === "event") outputs.push(output.event.type);
++        }
++      })();
++      const turnId = hostTurnIdSchema.parse("turn-1");
++      const accepted = await opened.value.execute({
++        type: "turn.start",
++        turnId,
++        input: [{ type: "text", text: "hello hmharness" }],
++      });
++      expect(accepted).toEqual({ ok: true, value: { turnId } });
++      await waitFor(() => outputs.includes("turn.completed"));
++      const snapshot = await opened.value.readSnapshot();
++      expect(snapshot).toMatchObject({ ok: true });
++      expect(snapshot.ok && snapshot.value.turns[0]?.items[0]?.item.type).toBe("agentMessage");
++      await opened.value.close();
++      await consumed;
++      const run = calls.find(({ arguments: args }) => args.includes("run"));
++      expect(run?.environment.HMH_CHAT_PROVIDER).toBe("omnifusion");
++      expect(run?.stdin).toContain("hello hmharness");
++      expect(outputs).toEqual(["turn.started", "item.started", "item.completed", "turn.completed"]);
++    } finally {
++      await rm(directory, { recursive: true, force: true });
++      await adapter.close();
++    }
++  });
++
++  it("streams deltas and closes the same Item with authoritative final text", async () => {
++    const directory = await mkdtemp(path.join(tmpdir(), "hmharness-adapter-stream-"));
++    const adapter = new HMHarnessAdapter(
++      { command: process.execPath, environment: { PATH: process.env.PATH } },
++      {
++        randomUUID: () => crypto.randomUUID(),
++        runBridge: async (input) => {
++          if (input.arguments.includes("providers")) {
++            return { stdout: providerJson, stderr: "", exitCode: 0 };
++          }
++          input.onStdoutLine?.(JSON.stringify({ type: "delta", text: "partial " }));
++          input.onStdoutLine?.(JSON.stringify({ type: "delta", text: "progress" }));
++          return {
++            stdout:
++              [
++                JSON.stringify({ type: "delta", text: "partial " }),
++                JSON.stringify({ type: "delta", text: "progress" }),
++                JSON.stringify({ text: "partial authoritative" }),
++              ].join("\n") + "\n",
++            stderr: "",
++            exitCode: 0,
++          };
++        },
++      },
++    );
++    try {
++      const opened = await adapter.open({ kind: "create", cwd: directory });
++      expect(opened.ok).toBe(true);
++      if (!opened.ok) return;
++      const outputs: HarnessOutput[] = [];
++      const consumed = (async () => {
++        for await (const output of opened.value.outputs) outputs.push(output);
++      })();
++      const turnId = hostTurnIdSchema.parse("turn-stream");
++      await opened.value.execute({
++        type: "turn.start",
++        turnId,
++        input: [{ type: "text", text: "stream hmharness" }],
++      });
++      await waitFor(() =>
++        outputs.some((output) => output.kind === "event" && output.event.type === "turn.completed"),
++      );
++      await opened.value.close();
++      await consumed;
++
++      const events = outputs.flatMap((output) => (output.kind === "event" ? [output.event] : []));
++      expect(events.map((event) => event.type)).toEqual([
++        "turn.started",
++        "item.started",
++        "item.updated",
++        "item.completed",
++        "turn.completed",
++      ]);
++      const itemStarted = events[1];
++      const itemCompleted = events[3];
++      if (itemStarted?.type !== "item.started" || itemCompleted?.type !== "item.completed") {
++        throw new Error("HMHarness streaming lifecycle was not projected");
++      }
++      expect(itemCompleted.snapshot.item.itemId).toBe(itemStarted.item.itemId);
++      if (itemCompleted.snapshot.item.type !== "agentMessage") {
++        throw new Error("HMHarness final Item is not an Agent Message");
++      }
++      expect(itemCompleted.snapshot.item.text).toBe("partial authoritative");
++      expect(itemCompleted.snapshot.outcome.status).toBe("succeeded");
++      const turnCompleted = events[4];
++      if (turnCompleted?.type !== "turn.completed") {
++        throw new Error("HMHarness streaming Turn did not complete");
++      }
++      if (!turnCompleted.nativeTurnRef) {
++        throw new Error("HMHarness successful Turn has no Native Turn identity");
++      }
++      expect(turnCompleted).toMatchObject({
++        turnId,
++        outcome: { status: "succeeded" },
++      });
++      expect(turnCompleted.nativeTurnRef.nativeSessionId).toBeTruthy();
++    } finally {
++      await rm(directory, { recursive: true, force: true });
++      await adapter.close();
++    }
++  });
++
++  it("projects cancellation as a cancelled turn", async () => {
++    const directory = await mkdtemp(path.join(tmpdir(), "hmharness-adapter-cancel-"));
++    const adapter = new HMHarnessAdapter(
++      { command: process.execPath },
++      {
++        randomUUID: () => crypto.randomUUID(),
++        runBridge: (input) =>
++          new Promise((_resolve, reject) => {
++            input.signal?.addEventListener("abort", () => reject(new Error("cancelled")), {
++              once: true,
++            });
++          }),
++      },
++    );
++    try {
++      const opened = await adapter.open({ kind: "create", cwd: directory });
++      expect(opened.ok).toBe(true);
++      if (!opened.ok) return;
++      const outputs: unknown[] = [];
++      const consumed = (async () => {
++        for await (const output of opened.value.outputs) outputs.push(output);
++      })();
++      const turnId = hostTurnIdSchema.parse("turn-cancel");
++      await opened.value.execute({
++        type: "turn.start",
++        turnId,
++        input: [{ type: "text", text: "long task" }],
++      });
++      const cancelled = await opened.value.execute({ type: "turn.cancel", turnId });
++      expect(cancelled).toEqual({ ok: true, value: { cancellationRequested: true } });
++      await waitFor(() => outputs.length === 2);
++      const completed = outputs.at(-1);
++      expect(completed).toMatchObject({
++        event: { type: "turn.completed", outcome: { status: "cancelled" } },
++      });
++      void hostItemIdSchema;
++      await opened.value.close();
++      await consumed;
++    } finally {
++      await rm(directory, { recursive: true, force: true });
++      await adapter.close();
++    }
++  });
++});
+diff --git a/packages/adapters/hmharness/tsconfig.json b/packages/adapters/hmharness/tsconfig.json
+new file mode 100644
+index 0000000..4ce8d88
+--- /dev/null
++++ b/packages/adapters/hmharness/tsconfig.json
+@@ -0,0 +1,16 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "compilerOptions": {
++    "composite": true,
++    "types": ["node"],
++    "rootDir": "src",
++    "outDir": "dist",
++    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
++  },
++  "references": [
++    { "path": "../../shared-contracts/tsconfig.json" },
++    { "path": "../../harness-adapter/tsconfig.json" },
++    { "path": "../../harness-discovery/tsconfig.json" }
++  ],
++  "include": ["src/**/*.ts"]
++}
+diff --git a/packages/desktop-control/src/production-controller.ts b/packages/desktop-control/src/production-controller.ts
+index c66b930..f913cf9 100644
+--- a/packages/desktop-control/src/production-controller.ts
++++ b/packages/desktop-control/src/production-controller.ts
+@@ -251,6 +251,7 @@ export async function runDesktopController(
+           "grok",
+           "omp",
+           "antigravity",
++          "hmharness",
+           "kiro-cli",
+         ],
+         timeoutMs: PRODUCTION_INSTALL_TIMEOUT_MS,
+diff --git a/packages/desktop-control/test/production-controller.test.ts b/packages/desktop-control/test/production-controller.test.ts
+index 339908e..28e31b7 100644
+--- a/packages/desktop-control/test/production-controller.test.ts
++++ b/packages/desktop-control/test/production-controller.test.ts
+@@ -150,6 +150,7 @@ describe("production Desktop Controller", () => {
+         "grok",
+         "omp",
+         "antigravity",
++        "hmharness",
+         "kiro-cli",
+       ],
+       timeoutMs: 90_000,
+diff --git a/packages/host-runtime/test/app-server-host.test.ts b/packages/host-runtime/test/app-server-host.test.ts
+index aa38cbc..2fd58d5 100644
+--- a/packages/host-runtime/test/app-server-host.test.ts
++++ b/packages/host-runtime/test/app-server-host.test.ts
+@@ -51,6 +51,7 @@ import {
+   type HostUpdateCoordinator,
+ } from "../src/index.js";
+ import type { OfficialAppServerConnection } from "../src/official-app-server-connection.js";
++import { HMHarnessAdapter } from "../../adapters/hmharness/src/hmharness-adapter.js";
+ 
+ class FakeOfficialProcess extends EventEmitter {
+   readonly stdin = new PassThrough();
+@@ -6246,6 +6247,63 @@ describe("AppServerHost HarnessAdapter projection", () => {
+     await stopFixture(fixture);
+   });
+ 
++  it("persists and idles an HMHarness streaming Turn", async () => {
++    const directory = mkdtempSync(path.join(tmpdir(), "codexhost-hmharness-host-"));
++    const hmAdapter = new HMHarnessAdapter(
++      { command: process.execPath, environment: { PATH: process.env.PATH } },
++      {
++        runBridge: async (input) => {
++          if (input.arguments.includes("providers")) {
++            return {
++              stdout: `${JSON.stringify({
++                version: "0.2.0",
++                chat: "agnes",
++                providers: [{ name: "agnes", model: "agnes-model", purposes: ["chat"] }],
++              })}\n`,
++              stderr: "",
++              exitCode: 0,
++            };
++          }
++          input.onStdoutLine?.(JSON.stringify({ type: "delta", text: "partial " }));
++          input.onStdoutLine?.(JSON.stringify({ type: "delta", text: "progress" }));
++          return {
++            stdout:
++              [
++                JSON.stringify({ type: "delta", text: "partial " }),
++                JSON.stringify({ type: "delta", text: "progress" }),
++                JSON.stringify({ text: "HMH-DONE" }),
++              ].join("\n") + "\n",
++            stderr: "",
++            exitCode: 0,
++          };
++        },
++      },
++    );
++    const fixture = createFixture({
++      mappingStoreDirectory: directory,
++      externalAdapters: new Map([
++        [harnessIdSchema.parse("hmharness"), hmAdapter],
++      ]) as unknown as ReadonlyMap<ExternalHarnessId, FakeHarnessAdapter>,
++    });
++    try {
++      const threadId = await startExternalThread(
++        fixture,
++        encodeHarnessPluginRoute({ harnessId: harnessIdSchema.parse("hmharness") }),
++      );
++      const turnId = await startPiTurn(fixture, threadId, 2);
++      await fixture.collector.waitFor((message) => turnEvent(message, "turn/completed", turnId));
++      await fixture.collector.waitFor((message) => threadStatus(message, threadId, "idle"));
++
++      const stored = await fixture.mappingStore.getThread(hostThreadIdSchema.parse(threadId));
++      expect(stored).not.toBeNull();
++      if (!stored) throw new Error("HMHarness Thread mapping was not stored");
++      expect(stored.turnMappings).toHaveLength(1);
++      expect(stored.turnMappings[0]).toMatchObject({ hostTurnId: turnId });
++    } finally {
++      await stopFixture(fixture);
++    }
++  });
++
+   it("updates a Pi Thread name locally", async () => {
+     const fixture = createFixture();
+     const officialWrite = vi.fn();
+diff --git a/packages/protocol-core/src/codex-ui-projector.ts b/packages/protocol-core/src/codex-ui-projector.ts
+index f65dec5..0c35ffe 100644
+--- a/packages/protocol-core/src/codex-ui-projector.ts
++++ b/packages/protocol-core/src/codex-ui-projector.ts
+@@ -1004,15 +1004,9 @@ export class CodexTurnProjector {
+     if (event.snapshot.item.type !== projected.item.type) {
+       throw new Error("Host Item changed type before completion");
+     }
+-    if (projected.item.type === "agentMessage" || projected.item.type === "reasoning") {
+-      const completedItem = event.snapshot.item;
+-      if (
+-        (completedItem.type !== "agentMessage" && completedItem.type !== "reasoning") ||
+-        completedItem.text !== projected.item.text
+-      ) {
+-        throw new Error("Host textual Item completion does not match its append updates");
+-      }
+-    }
++    // A completed Item snapshot is authoritative. Streaming adapters may need to
++    // replace partial text (for example when a Harness final result differs
++    // from its progress deltas), and the terminal event must still be projected.
+     projected.item = event.snapshot.item;
+     projected.outcome = event.snapshot.outcome;
+     const startedAtMs = projected.startedAtMs;
+diff --git a/packages/protocol-core/test/codex-ui-projector.test.ts b/packages/protocol-core/test/codex-ui-projector.test.ts
+index 17fa62a..37ff9b8 100644
+--- a/packages/protocol-core/test/codex-ui-projector.test.ts
++++ b/packages/protocol-core/test/codex-ui-projector.test.ts
+@@ -168,6 +168,62 @@ describe("Codex UI projector", () => {
+     });
+   });
+ 
++  it("lets a completed Agent Message replace streamed text with authoritative text", () => {
++    const value = projector();
++    const agentId = itemId("authoritative-agent");
++    value.project({ type: "turn.started", turnId });
++    value.project({
++      type: "item.started",
++      turnId,
++      item: { type: "agentMessage", itemId: agentId, text: "" },
++    });
++    value.project({
++      type: "item.updated",
++      turnId,
++      itemId: agentId,
++      update: { type: "text.append", text: "partial" },
++    });
++
++    expect(
++      value.project({
++        type: "item.completed",
++        turnId,
++        snapshot: {
++          item: { type: "agentMessage", itemId: agentId, text: "authoritative final" },
++          outcome: { status: "succeeded" },
++        },
++      }).messages,
++    ).toMatchObject([
++      {
++        method: "item/completed",
++        params: { item: { id: agentId, type: "agentMessage", text: "authoritative final" } },
++      },
++    ]);
++
++    const terminal = value.project({
++      type: "turn.completed",
++      turnId,
++      nativeTurnRef: nativeTurnRefSchema.parse({
++        harnessId: "hmharness",
++        nativeSessionId: "native-session",
++        nativeTurnKey: "native-turn",
++        formatVersion: 1,
++      }),
++      outcome: { status: "succeeded" },
++    });
++    expect(terminal.completedTurn).toMatchObject({
++      id: turnId,
++      status: "completed",
++      items: [
++        expect.objectContaining({
++          id: agentId,
++          type: "agentMessage",
++          text: "authoritative final",
++        }),
++      ],
++    });
++  });
++
+   it("projects Agent Message and Command Execution lifecycles", () => {
+     const value = projector();
+     const agentId = itemId("agent-1");
+diff --git a/packages/renderer-extension/src/agent-selection-state.ts b/packages/renderer-extension/src/agent-selection-state.ts
+index 7d8e6bb..9350d2c 100644
+--- a/packages/renderer-extension/src/agent-selection-state.ts
++++ b/packages/renderer-extension/src/agent-selection-state.ts
+@@ -13,6 +13,7 @@ export const KNOWN_RENDERER_AGENTS = [
+   "grok",
+   "omp",
+   "antigravity",
++  "hmharness",
+   "kiro-cli",
+ ] as const;
+ export const DEFAULT_RENDERER_AGENTS = KNOWN_RENDERER_AGENTS;
+@@ -40,6 +41,7 @@ export interface DraftComposerState {
+   ompThinkingOptionId?: HarnessThinkingOptionId;
+   antigravityModel?: HarnessModelRef;
+   antigravityThinkingOptionId?: HarnessThinkingOptionId;
++  hmHarnessModel?: HarnessModelRef;
+   kiroCliModel?: HarnessModelRef;
+   kiroCliThinkingOptionId?: HarnessThinkingOptionId;
+   permissionModeByAgent?: Partial<Record<ExternalRendererAgent, HarnessPermissionModeId>>;
+@@ -209,6 +211,7 @@ export class DraftAgentController<Composer extends object> {
+     if (agent === "grok" && model) state.grokModel = model;
+     if (agent === "omp" && model) state.ompModel = model;
+     if (agent === "antigravity" && model) state.antigravityModel = model;
++    if (agent === "hmharness" && model) state.hmHarnessModel = model;
+     if (agent === "kiro-cli" && model) state.kiroCliModel = model;
+     if (agent === "pi" && thinkingOptionId) state.piThinkingOptionId = thinkingOptionId;
+     else if (agent === "pi") delete state.piThinkingOptionId;
+@@ -238,6 +241,7 @@ export class DraftAgentController<Composer extends object> {
+         "grok",
+         "omp",
+         "antigravity",
++        "hmharness",
+         "kiro-cli",
+       ] as const) {
+         const current = state.permissionModeByAgent?.[candidate];
+@@ -262,6 +266,7 @@ export class DraftAgentController<Composer extends object> {
+     if (agent === "grok") return state.grokModel;
+     if (agent === "omp") return state.ompModel;
+     if (agent === "antigravity") return state.antigravityModel;
++    if (agent === "hmharness") return state.hmHarnessModel;
+     if (agent === "kiro-cli") return state.kiroCliModel;
+     return undefined;
+   }
+@@ -314,6 +319,7 @@ export class DraftAgentController<Composer extends object> {
+     else if (agent === "grok") state.grokModel = model;
+     else if (agent === "omp") state.ompModel = model;
+     else if (agent === "antigravity") state.antigravityModel = model;
++    else if (agent === "hmharness") state.hmHarnessModel = model;
+     else if (agent === "kiro-cli") state.kiroCliModel = model;
+     return state;
+   }
+diff --git a/packages/renderer-extension/src/index.ts b/packages/renderer-extension/src/index.ts
+index c7a9214..f229513 100644
+--- a/packages/renderer-extension/src/index.ts
++++ b/packages/renderer-extension/src/index.ts
+@@ -110,6 +110,7 @@ export {
+   CLAUDE_CODE_TRANSPORT_MODEL_PREFIX,
+   GROK_TRANSPORT_MODEL_ID,
+   GROK_TRANSPORT_MODEL_PREFIX,
++  HMHARNESS_PLUGIN_ID,
+   OPENCODE_TRANSPORT_MODEL_ID,
+   OPENCODE_TRANSPORT_MODEL_PREFIX,
+   antigravityTransportModelId,
+@@ -120,6 +121,7 @@ export {
+   decodeDeepSeekHarnessTransportModelId,
+   deepSeekHarnessTransportModelId,
+   decodeGrokTransportModelId,
++  hmHarnessTransportModelId,
+   decodeOpenCodeTransportModelId,
+   decodePiTransportModelId,
+   findActivePrewarmTargets,
+diff --git a/packages/renderer-extension/src/renderer-agent-icon.ts b/packages/renderer-extension/src/renderer-agent-icon.ts
+index a68c840..ab76acb 100644
+--- a/packages/renderer-extension/src/renderer-agent-icon.ts
++++ b/packages/renderer-extension/src/renderer-agent-icon.ts
+@@ -15,6 +15,7 @@ export const RENDERER_AGENT_LABELS: Record<RendererAgent, string> = {
+   grok: "Grok",
+   omp: "Oh My Pi",
+   antigravity: "Antigravity CLI",
++  hmharness: "HMHarness",
+   "kiro-cli": "Kiro CLI",
+ };
+ 
+@@ -35,6 +36,11 @@ const DEEPSEEK_HARNESS_WHALE_PATH =
+ const CLAUDE_PATH =
+   "M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z";
+ 
++const HMHARNESS_PATHS = [
++  { d: "M7 3h3.4v6.1h3.2V3H17v18h-3.4v-7.2h-3.2V21H7V3z" },
++  { d: "M19.1 3H22v18h-2.9V3z" },
++] as const;
++
+ function createSvgIcon(
+   paths: readonly { d: string; fillRule?: string; fill?: string }[],
+   color: string,
+@@ -122,6 +128,9 @@ export function createRendererAgentIcon(
+     image.style.flex = "none";
+     return image;
+   }
++  if (agent === "hmharness") {
++    return createSvgIcon(HMHARNESS_PATHS, "#2563eb", size, ownerDocument);
++  }
+   const mark = ownerDocument.createElement("img");
+   mark.src = grokAgentIconUrl;
+   mark.alt = "";
+diff --git a/packages/renderer-extension/src/renderer-agent-picker.ts b/packages/renderer-extension/src/renderer-agent-picker.ts
+index 86aeda7..beb4601 100644
+--- a/packages/renderer-extension/src/renderer-agent-picker.ts
++++ b/packages/renderer-extension/src/renderer-agent-picker.ts
+@@ -76,6 +76,7 @@ export const RENDERER_AGENT_INSTALL_URLS: Readonly<Record<ExternalRendererAgent,
+   grok: "https://grok.com/",
+   omp: "https://github.com/can1357/oh-my-pi",
+   antigravity: "https://antigravity.google/product/antigravity-cli",
++  hmharness: "https://www.npmjs.com/package/@hmharness/cli",
+   "kiro-cli": "https://kiro.dev/docs/cli/",
+ };
+ 
+diff --git a/packages/renderer-extension/src/renderer-binding-probe.ts b/packages/renderer-extension/src/renderer-binding-probe.ts
+index 03fed70..0db68a9 100644
+--- a/packages/renderer-extension/src/renderer-binding-probe.ts
++++ b/packages/renderer-extension/src/renderer-binding-probe.ts
+@@ -94,6 +94,7 @@ const externalHarnessIds = {
+   grok: harnessIdSchema.parse("grok"),
+   omp: harnessIdSchema.parse("omp"),
+   antigravity: harnessIdSchema.parse("antigravity"),
++  hmharness: harnessIdSchema.parse("hmharness"),
+   "kiro-cli": harnessIdSchema.parse("kiro-cli"),
+ } as const;
+ 
+@@ -105,6 +106,7 @@ const externalAgents: readonly ExternalRendererAgent[] = [
+   "grok",
+   "omp",
+   "antigravity",
++  "hmharness",
+   "kiro-cli",
+ ];
+ type HarnessAvailability = Partial<Record<ExternalRendererAgent, RendererAgentAvailability>>;
+@@ -456,6 +458,23 @@ export function restoredThreadOwnership(inspection: ThreadInspection): RestoredT
+       ...(permissionModeId ? { permissionModeId } : {}),
+     };
+   }
++  if (inspection.harnessId === "hmharness") {
++    const transportSelection = decodeHarnessPluginRoute(inspection.transportModelId);
++    if (!transportSelection || transportSelection.harnessId !== "hmharness") {
++      throw new Error("HMHarness Thread reported an incompatible transport Model");
++    }
++    const model = inspection.effectiveModel ?? transportSelection.model;
++    const thinkingOptionId =
++      selectableThinkingOptionId(inspection) ?? transportSelection.thinkingOptionId;
++    const permissionModeId =
++      inspection.effectivePermissionModeId ?? transportSelection.permissionModeId;
++    return {
++      agent: "hmharness",
++      ...(model ? { model } : {}),
++      ...(thinkingOptionId ? { thinkingOptionId } : {}),
++      ...(permissionModeId ? { permissionModeId } : {}),
++    };
++  }
+   if (inspection.harnessId === "kiro-cli") {
+     const route = decodeHarnessPluginRoute(inspection.transportModelId);
+     if (!route || route.harnessId !== "kiro-cli") {
+@@ -703,6 +722,7 @@ export function installRendererBindingProbe(
+       grok: undefined,
+       omp: undefined,
+       antigravity: undefined,
++      hmharness: undefined,
+       "kiro-cli": undefined,
+     },
+     webUi: Object.fromEntries(
+diff --git a/packages/renderer-extension/src/renderer-sidebar-agent-icons.ts b/packages/renderer-extension/src/renderer-sidebar-agent-icons.ts
+index 474c953..a4ddf05 100644
+--- a/packages/renderer-extension/src/renderer-sidebar-agent-icons.ts
++++ b/packages/renderer-extension/src/renderer-sidebar-agent-icons.ts
+@@ -139,6 +139,7 @@ export function rendererAgentForThreadOwnership(
+   if (ownership.harnessId === "grok") return "grok";
+   if (ownership.harnessId === "omp") return "omp";
+   if (ownership.harnessId === "antigravity") return "antigravity";
++  if (ownership.harnessId === "hmharness") return "hmharness";
+   if (ownership.harnessId === "kiro-cli") return "kiro-cli";
+   return null;
+ }
+diff --git a/packages/renderer-extension/src/settings/connections-page.ts b/packages/renderer-extension/src/settings/connections-page.ts
+index a95a6df..3fa298f 100644
+--- a/packages/renderer-extension/src/settings/connections-page.ts
++++ b/packages/renderer-extension/src/settings/connections-page.ts
+@@ -23,6 +23,7 @@ const HARNESS_INSTALL_URLS: Readonly<Record<ExternalRendererAgent, string>> = Ob
+   grok: "https://grok.com/",
+   omp: "https://github.com/can1357/oh-my-pi",
+   antigravity: "https://antigravity.google/product/antigravity-cli",
++  hmharness: "https://www.npmjs.com/package/@hmharness/cli",
+   "kiro-cli": "https://kiro.dev/docs/cli/",
+ });
+ 
+diff --git a/packages/renderer-extension/src/versioned-renderer-adapter.ts b/packages/renderer-extension/src/versioned-renderer-adapter.ts
+index 7cf5e57..501bb02 100644
+--- a/packages/renderer-extension/src/versioned-renderer-adapter.ts
++++ b/packages/renderer-extension/src/versioned-renderer-adapter.ts
+@@ -3,6 +3,7 @@ import {
+   harnessIdSchema,
+   harnessModelRefSchema,
+   harnessPermissionModeIdSchema,
++  harnessPluginIdSchema,
+   harnessThinkingOptionIdSchema,
+   hostThreadIdSchema,
+   type ExternalThreadForkParams,
+@@ -46,6 +47,7 @@ export const OMP_TRANSPORT_MODEL_ID = "codexhost/omp-native";
+ export const OMP_TRANSPORT_MODEL_PREFIX = `${OMP_TRANSPORT_MODEL_ID}@`;
+ export const ANTIGRAVITY_TRANSPORT_MODEL_ID = "codexhost/antigravity-native";
+ export const ANTIGRAVITY_TRANSPORT_MODEL_PREFIX = `${ANTIGRAVITY_TRANSPORT_MODEL_ID}@`;
++export const HMHARNESS_PLUGIN_ID = "hmharness";
+ 
+ export type RendererAdapterState = "installing" | "ready" | "unsupported";
+ 
+@@ -145,6 +147,7 @@ function transportModelIdForAgent(agent: RendererAgent): string | null {
+   if (agent === "grok") return GROK_TRANSPORT_MODEL_ID;
+   if (agent === "omp") return OMP_TRANSPORT_MODEL_ID;
+   if (agent === "antigravity") return ANTIGRAVITY_TRANSPORT_MODEL_ID;
++  if (agent === "hmharness") return hmHarnessTransportModelId();
+   if (agent === "kiro-cli") return encodeHarnessPluginRoute({ harnessId: KIRO_CLI_HARNESS_ID });
+   return null;
+ }
+@@ -216,6 +219,23 @@ export function antigravityTransportModelId(
+   return `${ANTIGRAVITY_TRANSPORT_MODEL_PREFIX}${parsedModel.id}${parsedPermission ? `@${parsedPermission}` : ""}`;
+ }
+ 
++export function hmHarnessTransportModelId(
++  model?: HarnessModelRef,
++  thinkingOptionId?: HarnessThinkingOptionId,
++  permissionModeId?: HarnessPermissionModeId,
++): string {
++  return encodeHarnessPluginRoute({
++    harnessId: harnessPluginIdSchema.parse(HMHARNESS_PLUGIN_ID),
++    ...(model ? { model: harnessModelRefSchema.parse(model) } : {}),
++    ...(thinkingOptionId
++      ? { thinkingOptionId: harnessThinkingOptionIdSchema.parse(thinkingOptionId) }
++      : {}),
++    ...(permissionModeId
++      ? { permissionModeId: harnessPermissionModeIdSchema.parse(permissionModeId) }
++      : {}),
++  });
++}
++
+ export function openCodeTransportModelId(
+   model?: HarnessModelRef,
+   permissionModeId?: HarnessPermissionModeId,
+@@ -912,6 +932,12 @@ export function modelSelectionForAgent(
+   thinkingOptionId?: HarnessThinkingOptionId,
+   permissionModeId?: HarnessPermissionModeId,
+ ): ModelPowerSelection | null {
++  if (agent === "hmharness") {
++    return {
++      model: hmHarnessTransportModelId(model, thinkingOptionId, permissionModeId),
++      reasoningEffort,
++    };
++  }
+   const transportModelId =
+     agent === "pi"
+       ? piTransportModelId(model, thinkingOptionId)
+diff --git a/packages/renderer-extension/test/renderer-binding-probe.test.ts b/packages/renderer-extension/test/renderer-binding-probe.test.ts
+index f0682ee..ae692ff 100644
+--- a/packages/renderer-extension/test/renderer-binding-probe.test.ts
++++ b/packages/renderer-extension/test/renderer-binding-probe.test.ts
+@@ -33,6 +33,7 @@ import {
+   shouldRetryExternalThreadUsage,
+   shouldTransferComposerState,
+ } from "../src/renderer-binding-probe.js";
++import { hmHarnessTransportModelId } from "../src/versioned-renderer-adapter.js";
+ import {
+   editorForElement,
+   isComposerInputIntent,
+@@ -172,6 +173,7 @@ describe("Renderer Composer DOM behavior", () => {
+           grok: undefined,
+           omp: undefined,
+           antigravity: undefined,
++          hmharness: undefined,
+           "kiro-cli": undefined,
+         },
+       ),
+@@ -200,6 +202,7 @@ describe("Renderer Composer DOM behavior", () => {
+           grok: undefined,
+           omp: undefined,
+           antigravity: undefined,
++          hmharness: undefined,
+           "kiro-cli": undefined,
+         },
+       ),
+@@ -228,6 +231,7 @@ describe("Renderer Composer DOM behavior", () => {
+           grok: undefined,
+           omp: undefined,
+           antigravity: undefined,
++          hmharness: undefined,
+           "kiro-cli": undefined,
+         },
+       ),
+@@ -245,6 +249,7 @@ describe("Renderer Composer DOM behavior", () => {
+           grok: "checking",
+           omp: "checking",
+           antigravity: "checking",
++          hmharness: "checking",
+         },
+         {
+           pi: undefined,
+@@ -254,10 +259,20 @@ describe("Renderer Composer DOM behavior", () => {
+           grok: undefined,
+           omp: undefined,
+           antigravity: undefined,
++          hmharness: undefined,
+           "kiro-cli": undefined,
+         },
+       ),
+-    ).toEqual(["pi", "claude-code", "deepseek-harness", "opencode", "grok", "omp", "antigravity"]);
++    ).toEqual([
++      "pi",
++      "claude-code",
++      "deepseek-harness",
++      "opencode",
++      "grok",
++      "omp",
++      "antigravity",
++      "hmharness",
++    ]);
+ 
+     expect(
+       passiveHarnessAvailabilityAgents(
+@@ -282,6 +297,7 @@ describe("Renderer Composer DOM behavior", () => {
+           grok: undefined,
+           omp: undefined,
+           antigravity: undefined,
++          hmharness: undefined,
+           "kiro-cli": undefined,
+         },
+       ),
+@@ -310,6 +326,7 @@ describe("Renderer Composer DOM behavior", () => {
+           grok: undefined,
+           omp: undefined,
+           antigravity: undefined,
++          hmharness: undefined,
+           "kiro-cli": undefined,
+         },
+       ),
+@@ -1090,6 +1107,20 @@ describe("Renderer Composer DOM behavior", () => {
+       thinkingOptionId: "high",
+       permissionModeId: "configured",
+     });
++    expect(
++      restoredThreadOwnership({
++        owner: "external",
++        harnessId: "hmharness",
++        transportModelId: hmHarnessTransportModelId(
++          harnessModelRefSchema.parse({ id: "hmharness-configured-provider" }),
++        ),
++        history: { fork: false, forkAcrossCwd: false, rollbackLastTurn: false },
++        locked: true,
++      }),
++    ).toEqual({
++      agent: "hmharness",
++      model: { id: "hmharness-configured-provider" },
++    });
+     expect(() =>
+       restoredThreadOwnership({
+         owner: "external",
+diff --git a/packages/renderer-extension/test/versioned-renderer-adapter.test.ts b/packages/renderer-extension/test/versioned-renderer-adapter.test.ts
+index 4c5f31c..285b728 100644
+--- a/packages/renderer-extension/test/versioned-renderer-adapter.test.ts
++++ b/packages/renderer-extension/test/versioned-renderer-adapter.test.ts
+@@ -1,4 +1,5 @@
+ import {
++  decodeHarnessPluginRoute,
+   harnessModelRefSchema,
+   harnessPermissionModeIdSchema,
+   harnessThinkingOptionIdSchema,
+@@ -23,6 +24,7 @@ import {
+   decodePiTransportModelId,
+   findActivePrewarmTargets,
+   findComposerModelTarget,
++  hmHarnessTransportModelId,
+   isAntigravityTransportModelId,
+   isClaudeTransportModelId,
+   isGrokTransportModelId,
+@@ -522,9 +524,24 @@ describe("current Codex Renderer Agent adapter", () => {
+     );
+     expect(modelSelectionForAgent(null, null, "grok")?.model).toBe(GROK_TRANSPORT_MODEL_ID);
+     expect(modelSelectionForAgent(null, null, "opencode")?.model).toBe(OPENCODE_TRANSPORT_MODEL_ID);
++    expect(
++      decodeHarnessPluginRoute(modelSelectionForAgent(null, null, "hmharness")?.model),
++    ).toEqual({ harnessId: "hmharness" });
+     expect(modelSelectionForAgent(null, null, "codex")).toBeNull();
+   });
+ 
++  it("encodes HMHarness with the shared plugin transport carrier", () => {
++    const model = harnessModelRefSchema.parse({ id: "hmharness-configured-provider" });
++    const carrier = hmHarnessTransportModelId(model);
++
++    expect(carrier.startsWith("codexhost/plugin-v1@")).toBe(true);
++    expect(decodeHarnessPluginRoute(carrier)).toEqual({
++      harnessId: "hmharness",
++      model,
++    });
++    expect(modelSelectionForAgent(null, null, "hmharness", model)?.model).toBe(carrier);
++  });
++
+   it("encodes selected Pi Model and Thinking in the transport carrier", () => {
+     const model = harnessModelRefSchema.parse({ id: "pi-model-v1.synthetic" });
+     const thinkingOptionId = harnessThinkingOptionIdSchema.parse("xhigh");
+diff --git a/scripts/release/harness-plugins.json b/scripts/release/harness-plugins.json
+index 862a020..53375fd 100644
+--- a/scripts/release/harness-plugins.json
++++ b/scripts/release/harness-plugins.json
+@@ -7,6 +7,7 @@
+     "packages/adapters/grok",
+     "packages/adapters/omp",
+     "packages/adapters/antigravity",
++    "packages/adapters/hmharness",
+     "packages/adapters/kiro-cli"
+   ],
+   "runtimePackages": [
+diff --git a/tests/release/production-renderer.test.mjs b/tests/release/production-renderer.test.mjs
+index 4644156..aa9b6ae 100644
+--- a/tests/release/production-renderer.test.mjs
++++ b/tests/release/production-renderer.test.mjs
+@@ -24,6 +24,7 @@ describe("production Renderer release chain", () => {
+     expect(agentState).toContain('"opencode",');
+     expect(agentState).toContain('"grok",');
+     expect(agentState).toContain('"antigravity",');
++    expect(agentState).toContain('"hmharness",');
+     expect(agentState).toContain("DEFAULT_RENDERER_AGENTS = KNOWN_RENDERER_AGENTS");
+     expect(productionEntry).toContain("installRendererBinding(DEFAULT_RENDERER_AGENTS");
+     expect(productionEntry).toContain("__codexhostProductionConfigV1");
+@@ -47,6 +48,7 @@ describe("production Renderer release chain", () => {
+     expect(RENDERER_PROBE_AGENTS).toContain("opencode");
+     expect(RENDERER_PROBE_AGENTS).toContain("grok");
+     expect(RENDERER_PROBE_AGENTS).toContain("antigravity");
++    expect(RENDERER_PROBE_AGENTS).toContain("hmharness");
+     expect(status.selections).toEqual([
+       { composerId: "composer-grok", agent: "grok", phase: "draft" },
+     ]);
+diff --git a/tools/renderer-binding/run.mjs b/tools/renderer-binding/run.mjs
+index 36a6017..bc0699f 100644
+--- a/tools/renderer-binding/run.mjs
++++ b/tools/renderer-binding/run.mjs
+@@ -22,6 +22,7 @@ export const RENDERER_PROBE_AGENTS = Object.freeze([
+   "opencode",
+   "grok",
+   "antigravity",
++  "hmharness",
+ ]);
+ 
+ function usage() {
+diff --git a/tsconfig.json b/tsconfig.json
+index 6119ee6..8ea53bf 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -16,6 +16,7 @@
+     { "path": "./packages/adapters/grok/tsconfig.json" },
+     { "path": "./packages/adapters/omp/tsconfig.json" },
+     { "path": "./packages/adapters/antigravity/tsconfig.json" },
++    { "path": "./packages/adapters/hmharness/tsconfig.json" },
+     { "path": "./packages/adapters/kiro-cli/tsconfig.json" },
+     { "path": "./packages/host-runtime/tsconfig.json" },
+     { "path": "./packages/renderer-extension/tsconfig.json" }
