@@ -14,7 +14,7 @@ import type { HarnessOutput } from "@codexhost/harness-adapter";
 import type { HMHarnessBridgeInput } from "../src/hmharness-adapter.js";
 
 const providerJson = `${JSON.stringify({
-  version: "0.2.0",
+  version: "0.5.2",
   chat: "agnes",
   providers: [
     { name: "agnes", model: "agnes-model", purposes: ["chat"] },

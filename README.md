@@ -2,7 +2,7 @@
 
 [![English](https://img.shields.io/badge/README-English-blue)](#english) [![中文](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-red)](#%E4%B8%AD%E6%96%87) [![HMHarness](https://img.shields.io/badge/Friend%20link-HMHarness-2CA5E0)](https://github.com/swsgbl/hmharness) [![CodexHost](https://img.shields.io/badge/Friend%20link-CodexHost-111827)](https://github.com/BytePioneer-AI/codex-host) [![AtomGit](https://img.shields.io/badge/Mirror-AtomGit-1677FF)](https://atomgit.com/hongfu/hmharness-codexhost-adapter)
 
-This repository is a bilingual, source-provenance backup of the working HMHarness integration for CodexHost. It preserves the adapter, bridge protocol, renderer integration, tests, and a clean patch that applies to upstream CodexHost.
+This repository is a bilingual, source-provenance backup of the working HMHarness integration for CodexHost. It preserves the adapter, bridge protocol, renderer integration, tests, and the clean patch submitted to upstream CodexHost as [PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243).
 
 ## English
 
@@ -22,7 +22,7 @@ The bridge exits immediately after emitting the final line. The adapter treats t
 ### Repository Layout
 
 - `patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch`
-  - Clean source/test-only patch against CodexHost commit `0b76b9de8c6f551506287d9a12905f9fdc860da2`.
+  - Clean source/test-only patch against official CodexHost `main` commit `25fb54f2b91f0f4c488051287ffa813513c9a060`; it is the patch behind PR [#243](https://github.com/BytePioneer-AI/codex-host/pull/243).
 - `snapshots/codex-host/`
   - Exact source and test files from the verified local integration.
 - `snapshots/hmharness/packages/codexhost-bridge/`
@@ -37,7 +37,7 @@ The bridge exits immediately after emitting the final line. The adapter treats t
 ```bash
 git clone https://github.com/BytePioneer-AI/codex-host.git
 cd codex-host
-git checkout 0b76b9de8c6f551506287d9a12905f9fdc860da2
+git checkout 25fb54f2b91f0f4c488051287ffa813513c9a060
 git apply --check path/to/0001-add-hmharness-adapter-and-streaming-bridge.patch
 git apply path/to/0001-add-hmharness-adapter-and-streaming-bridge.patch
 npm install
@@ -45,34 +45,40 @@ npm run typecheck
 npx vitest run --config tests/vitest.config.js \
   packages/protocol-core/test/codex-ui-projector.test.ts \
   packages/adapters/hmharness/test/hmharness-adapter.test.ts \
-  packages/host-runtime/test/app-server-host.test.ts
+  packages/host-runtime/test/app-server-host.test.ts \
+  packages/renderer-extension/test/renderer-binding-probe.test.ts \
+  packages/renderer-extension/test/versioned-renderer-adapter.test.ts \
+  tests/release/production-renderer.test.mjs
 ```
 
-The bridge package in this backup is an implementation snapshot, not a published npm package. Copy it into an HMHarness monorepo workspace or install it from a local path. Do not place a second `hmharness` plugin in CodexHost's user plugin directory; duplicate plugin IDs cause both plugins to be rejected.
+The bridge is publicly distributed as [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge). The current npm release is `0.5.2`; its tarball was installed and verified with a fake credential-free provider probe. The source snapshot here is the next `0.5.3` candidate from HMHarness commit `a72596f637035073221d41cb542b081e45bae543`.
 
-### Upstream Readiness
+Do not place a second `hmharness` plugin in CodexHost's user plugin directory; duplicate plugin IDs cause both plugins to be rejected.
 
-This integration is worth proposing upstream, but it is not ready for immediate merge into the official CodexHost default branch:
+### Upstream Status
 
-- Publish a non-private `@hmharness/codexhost-bridge` package or vendor a maintained bridge path. On 2026-09-10, npm returned 404 for this package and its manifest is marked `private: true`.
-- Reconcile the bridge dependency versions with the current HMHarness release. The bridge manifest currently pins `@hmharness/agent` and `@hmharness/kernel` to `0.2.0`, while the HMHarness monorepo packages are at `0.5.2`.
-- Create a clean feature branch from official `main`. The original local working history also contains build products, machine backups, and temporary merge artifacts; only the curated patch in this repository should be submitted.
-- Clarify licensing at the HMHarness source: package manifests declare Apache-2.0 while the repository root carries MIT text. Preserve both notices until upstream resolves the intended license.
-- Add a small upstream-friendly CI job covering the adapter, projector, host runtime, bridge version output, and provider listing without credentials.
+- The official proposal is [CodexHost PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243), based on official commit `25fb54f`.
+- `@hmharness/codexhost-bridge@0.5.2` is public on npm, is not private, declares MIT, and points to the correct monorepo subdirectory.
+- HMHarness source now carries the `0.5.3` bridge with matching `@hmharness/agent` and `@hmharness/kernel` dependencies. `0.5.3` is ready to publish after npm web login is completed.
+- The PR excludes local build products, temporary scripts, machine paths, credentials, and runtime state.
+- The remaining work is upstream review feedback, optional upstream CI coverage, and publishing bridge `0.5.3` after authentication.
 
 ### Validation Snapshot
 
 On 2026-09-10:
 
 - CodexHost `npm run typecheck`: passed.
-- CodexHost targeted suite: 3 files, 170 tests passed.
+- CodexHost `npm run build:typescript`: passed.
+- CodexHost `npm run lint`: passed.
+- CodexHost targeted suite: 6 files, 256 tests passed.
 - HM bridge Node test: 2 tests passed.
-- Clean patch applied with `git apply --check` to upstream commit `0b76b9d`.
+- Clean patch generated from official `main` commit `25fb54f` and PR commit `3de8496`.
+- Installed npm bridge tarball `0.5.2`: `--version` passed, provider output selected the expected model, and the fake key did not leak.
 - Real CodexHost/HMHarness smoke: thread and turn completed, result was available, the HM bridge process exited, and the UI Thinking count was zero.
 
 ### License And Notices
 
-See [LICENSE](LICENSE.md), [NOTICE.md](NOTICE.md), and the complete texts under [licenses/](licenses/). The CodexHost patch and snapshot derive from MIT-licensed CodexHost source. The HM bridge snapshot declares Apache-2.0 in its package manifest.
+See [LICENSE](LICENSE.md), [NOTICE.md](NOTICE.md), and the complete texts under [licenses/](licenses/). The CodexHost and HMHarness snapshots are MIT-licensed.
 
 ### Friendly Links
 
@@ -85,7 +91,7 @@ See [LICENSE](LICENSE.md), [NOTICE.md](NOTICE.md), and the complete texts under 
 
 ### 项目简介
 
-这是 HMHarness 接入 CodexHost 的双语开源备份仓库，保留当前已经真实验证过的 adapter、bridge 协议、桌面端集成、回归测试，以及一份可干净应用到官方 CodexHost 源码的补丁。
+这是 HMHarness 接入 CodexHost 的双语开源备份仓库，保留当前已经真实验证过的 adapter、bridge 协议、桌面端集成、回归测试，以及已提交给官方 CodexHost 的 [PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243) 对应补丁。
 
 接入分为两部分：
 
@@ -100,7 +106,7 @@ bridge 输出最终记录后立即退出。adapter 信任 `item.completed` 的�
 
 ### 仓库结构
 
-- `patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch`：只包含源码和测试的精选补丁，基准为官方 `main` 提交 `0b76b9de8c6f551506287d9a12905f9fdc860da2`。
+- `patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch`：只包含源码和测试的精选补丁，基准为官方 `main` 提交 `25fb54f2b91f0f4c488051287ffa813513c9a060`，即 [PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243)。
 - `snapshots/codex-host/`：已验证集成中涉及的 CodexHost 源码和测试文件。
 - `snapshots/hmharness/packages/codexhost-bridge/`：adapter 依赖的机器可读 bridge 实现。
 - `manifest/provenance.json`：来源提交、哈希、补丁可应用性和验证结果。
@@ -111,7 +117,7 @@ bridge 输出最终记录后立即退出。adapter 信任 `item.completed` 的�
 ```bash
 git clone https://github.com/BytePioneer-AI/codex-host.git
 cd codex-host
-git checkout 0b76b9de8c6f551506287d9a12905f9fdc860da2
+git checkout 25fb54f2b91f0f4c488051287ffa813513c9a060
 git apply --check path/to/0001-add-hmharness-adapter-and-streaming-bridge.patch
 git apply path/to/0001-add-hmharness-adapter-and-streaming-bridge.patch
 npm install
@@ -119,34 +125,42 @@ npm run typecheck
 npx vitest run --config tests/vitest.config.js \
   packages/protocol-core/test/codex-ui-projector.test.ts \
   packages/adapters/hmharness/test/hmharness-adapter.test.ts \
-  packages/host-runtime/test/app-server-host.test.ts
+  packages/host-runtime/test/app-server-host.test.ts \
+  packages/renderer-extension/test/renderer-binding-probe.test.ts \
+  packages/renderer-extension/test/versioned-renderer-adapter.test.ts \
+  tests/release/production-renderer.test.mjs
 ```
 
-这里的 bridge 是实现快照，不是已发布 npm 包。可以复制回 HMHarness monorepo workspace，或从本地路径安装。不要把另一个 `hmharness` 插件放进 CodexHost 的用户插件目录；重复插件 ID 会导致两个插件同时被拒绝。
+bridge 已在 npm 公开发布为 [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge)。当前 npm 版本是 `0.5.2`，其 tarball 已完成真实安装、`--version` 和无凭据 provider 输出验证；本仓库快照是 HMHarness 提交 `a72596f637035073221d41cb542b081e45bae543` 上的下一个 `0.5.3` 候选。
+
+不要把另一个 `hmharness` 插件放进 CodexHost 的用户插件目录；重复插件 ID 会导致两个插件同时被拒绝。
 
 ### 是否建议合并到官方仓库
 
-建议作为功能提案提交给官方，但不建议把当前本地历史直接推送或直接请求合并：
+当前已经建议并提交给官方：
 
-- 先发布非 private 的 `@hmharness/codexhost-bridge`，或提供官方可维护的 vendored bridge 路径。2026-09-10 查询 npm 时该包返回 404，manifest 也标记为 `private: true`。
-- bridge 依赖仍固定在 HMHarness `0.2.0`，而 HMHarness 当前包版本是 `0.5.2`，需要升级并回归。
-- 官方 PR 必须从官方 `main` 新建干净分支。本仓库的精选补丁已排除本地构建产物、全局安装备份和临时合并脚本。
-- HMHarness 根许可证写 MIT，各 package manifest 写 Apache-2.0，提官方前需要在上游明确统一。
-- 建议官方 CI 至少覆盖 adapter、projector、host runtime、bridge 版本输出和不含凭据的 provider 列表。
+- 官方提案是 [CodexHost PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243)，基于官方提交 `25fb54f` 的干净分支。
+- `@hmharness/codexhost-bridge@0.5.2` 已公开发布，非 private，MIT 许可，npm repository directory 指向正确。
+- HMHarness 源码中的 bridge 已升级为 `0.5.3`，并匹配 `@hmharness/agent` / `@hmharness/kernel` `0.5.3`；等待 npm 登录后即可发布。
+- PR 已排除本地构建产物、临时脚本、机器路径、凭据和运行状态。
+- 剩余工作是等待官方 review、按需补充 CI 覆盖，以及完成 npm 登录后发布 `0.5.3`。
 
 ### 验证记录
 
 2026-09-10：
 
 - CodexHost `npm run typecheck`：通过。
-- CodexHost 定向测试：3 个文件、170 个用例全部通过。
+- CodexHost `npm run build:typescript`：通过。
+- CodexHost `npm run lint`：通过。
+- CodexHost 定向测试：6 个文件、256 个用例全部通过。
 - HM bridge Node 测试：2 个用例通过。
-- 精选补丁对官方提交 `0b76b9d` 执行 `git apply --check`：通过。
+- 精选补丁由官方提交 `25fb54f` 和 PR 提交 `3de8496` 生成。
+- npm bridge `0.5.2` tarball 真实安装验证：`--version` 通过，provider 输出符合预期，假 key 未泄露。
 - 真实 CodexHost/HMHarness 冒烟：thread 与 turn 均完成，结果可读取，bridge 进程退出，UI“正在思考”计数为 0。
 
 ### 许可证与声明
 
-见 [LICENSE.md](LICENSE.md)、[NOTICE.md](NOTICE.md) 和 [licenses/](licenses/) 下的完整文本。CodexHost 补丁和快照来源于 MIT 许可的 CodexHost 源码；HM bridge 快照的 package manifest 声明为 Apache-2.0。
+见 [LICENSE.md](LICENSE.md)、[NOTICE.md](NOTICE.md) 和 [licenses/](licenses/) 下的完整文本。CodexHost 与 HMHarness 快照均为 MIT 许可。
 
 ### 友情链接
 

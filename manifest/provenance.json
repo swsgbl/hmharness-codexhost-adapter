@@ -1,30 +1,36 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-10T15:23:08+08:00",
+  "generatedAt": "2026-09-10T20:58:25+08:00",
   "codexHost": {
     "upstream": "https://github.com/BytePioneer-AI/codex-host",
-    "baseCommit": "0b76b9de8c6f551506287d9a12905f9fdc860da2",
-    "verifiedLocalHead": "4440ec8b1f61dd3a28c20fcaade0508774fd5f45",
+    "baseCommit": "25fb54f2b91f0f4c488051287ffa813513c9a060",
+    "verifiedLocalHead": "3de8496200e3cad2ecf5cb934c54b58d1edf7446",
+    "upstreamPullRequest": "https://github.com/BytePioneer-AI/codex-host/pull/243",
+    "branch": "swsgbl:hmharness-adapter",
     "patch": "patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch",
-    "patchSha256": "1205973032047AFD02B96DAED76744BB5BD3EA75372BB14922885F6184BDF95C",
+    "patchSha256": "B1C883BA217287F7F04C9CDDD1BFB89F4E753215BEC09BAC23A0263BC678C77F",
     "patchAppliesCleanlyToBaseCommit": true,
-    "changedFiles": 29,
-    "insertions": 1562,
+    "changedFiles": 30,
+    "insertions": 1594,
     "deletions": 10
   },
   "hmharness": {
     "upstream": "https://github.com/swsgbl/hmharness",
-    "repositoryCommit": "2af518413230ddd3b4914711a4c6515f31edc95a",
+    "repositoryCommit": "a72596f637035073221d41cb542b081e45bae543",
     "bridgeSnapshot": "snapshots/hmharness/packages/codexhost-bridge",
-    "bridgeVersion": "0.2.0",
-    "bridgePackagePublishedOnNpm": false
+    "bridgeSourceVersion": "0.5.3",
+    "bridgeNpmLatestVersion": "0.5.2",
+    "bridgePackagePublishedOnNpm": true,
+    "bridgeNpmLicense": "MIT",
+    "bridgeNpmTarballSha256": "8B70C95EAE12C4FB84636B603A2AFF76A01375F05A0370350D3258554B5F2920"
   },
   "validation": {
     "codexHostTypecheck": "passed",
-    "codexHostTargetedTests": "3 files / 170 tests passed",
+    "codexHostBuild": "passed",
+    "codexHostLint": "passed",
+    "codexHostTargetedTests": "6 files / 256 tests passed",
     "bridgeNodeTests": "2 tests passed",
     "patchApplyCheck": "passed",
     "runtimeSmoke": "completed thread and turn; bridge exited; UI thinking count 0"
   }
 }
-

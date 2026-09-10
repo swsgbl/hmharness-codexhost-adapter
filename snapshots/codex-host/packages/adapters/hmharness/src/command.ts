@@ -32,15 +32,12 @@ export function resolveHmHarnessExecutable(
   } = {},
 ): string | undefined {
   const platform = input.platform ?? process.platform;
-  const resolution = resolveHarnessExecutable(
-    hmHarnessDiscoverySpec,
-    {
-      ...(input.command ? { command: input.command } : {}),
-      environment: input.environment ?? process.env,
-      ...(input.homeDirectory ? { homeDirectory: input.homeDirectory } : {}),
-      platform,
-    },
-  );
+  const resolution = resolveHarnessExecutable(hmHarnessDiscoverySpec, {
+    ...(input.command ? { command: input.command } : {}),
+    environment: input.environment ?? process.env,
+    ...(input.homeDirectory ? { homeDirectory: input.homeDirectory } : {}),
+    platform,
+  });
   if (!resolution) return undefined;
   return targetPath(platform).isAbsolute(resolution.executable)
     ? resolution.executable

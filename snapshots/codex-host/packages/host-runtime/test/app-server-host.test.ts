@@ -51,7 +51,7 @@ import {
   type HostUpdateCoordinator,
 } from "../src/index.js";
 import type { OfficialAppServerConnection } from "../src/official-app-server-connection.js";
-import { HMHarnessAdapter } from "../../adapters/hmharness/src/hmharness-adapter.js";
+import { HMHarnessAdapter } from "@codexhost/adapter-hmharness";
 
 class FakeOfficialProcess extends EventEmitter {
   readonly stdin = new PassThrough();
@@ -2456,6 +2456,41 @@ describe("AppServerHost HarnessAdapter projection", () => {
         .result.data[0]?.items ?? [];
     expect(storedItems.filter((item) => item.type === "userMessage")).toHaveLength(1);
     expect(new Set(storedItems.map((item) => item.id)).size).toBe(storedItems.length);
+    await stopFixture(fixture);
+  });
+
+  it("inherits cwd from a native Codex parent when delegation omits cwd", async () => {
+    let delegationApi: DelegationControlApi | undefined;
+    const fixture = createFixture({
+      onDelegationApi: (api) => {
+        delegationApi = api;
+        return undefined;
+      },
+    });
+    await vi.waitFor(() => expect(delegationApi).toBeDefined());
+    if (!delegationApi) throw new Error("Delegation API was not registered");
+    await bindOfficialThread(fixture, "native-parent");
+
+    const pending = delegationApi.start({
+      harnessId: "pi",
+      task: "inherit workspace",
+      parentThreadId: "native-parent",
+    });
+    const read = await readJsonLine(fixture.official.stdin);
+    expect(read).toMatchObject({
+      method: "thread/read",
+      params: { threadId: "native-parent" },
+    });
+    fixture.official.stdout.write(
+      `${JSON.stringify({
+        id: read.id,
+        result: { thread: { id: "native-parent", cwd: "/native-workspace" } },
+      })}\n`,
+    );
+
+    await expect(pending).resolves.toMatchObject({ harnessId: "pi", status: "running" });
+    expect(fixture.adapter.sessions[0]?.cwd).toBe(path.resolve("/native-workspace"));
+    fixture.adapter.sessions[0]?.succeedTurn();
     await stopFixture(fixture);
   });
 
@@ -6256,7 +6291,7 @@ describe("AppServerHost HarnessAdapter projection", () => {
           if (input.arguments.includes("providers")) {
             return {
               stdout: `${JSON.stringify({
-                version: "0.2.0",
+                version: "0.5.2",
                 chat: "agnes",
                 providers: [{ name: "agnes", model: "agnes-model", purposes: ["chat"] }],
               })}\n`,

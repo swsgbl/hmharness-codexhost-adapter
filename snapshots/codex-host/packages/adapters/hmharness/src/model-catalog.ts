@@ -45,7 +45,8 @@ export function parseHmHarnessProviderCatalog(stdout: string): HmHarnessProvider
     throw new Error("HMHarness provider catalog has an invalid root");
   }
   const root = parsed as Record<string, unknown>;
-  const chat = root.chat === null || root.chat === undefined ? null : text(root.chat, "chat provider");
+  const chat =
+    root.chat === null || root.chat === undefined ? null : text(root.chat, "chat provider");
   const providers = root.providers;
   if (!Array.isArray(providers) || providers.length === 0) {
     throw new Error("HMHarness provider catalog has no models");
@@ -76,7 +77,9 @@ export interface HmHarnessNativeModelRef {
 export function encodeHmHarnessModelRef(model: HmHarnessNativeModelRef): HarnessModelRef {
   const provider = text(model.provider, "provider name");
   const nativeModel = text(model.model, "model");
-  const encoded = Buffer.from(JSON.stringify([provider, nativeModel]), "utf8").toString("base64url");
+  const encoded = Buffer.from(JSON.stringify([provider, nativeModel]), "utf8").toString(
+    "base64url",
+  );
   const id = `${MODEL_REF_PREFIX}${encoded}`;
   if (id.length > HARNESS_MODEL_REF_MAX_LENGTH) {
     throw new Error("HMHarness Model identity is too long");
@@ -116,14 +119,17 @@ export function normalizeHmHarnessModelCatalog(
   catalog: HmHarnessProviderCatalog,
 ): HarnessModelCatalog {
   const models = [...catalog.providers]
-    .sort((left, right) => left.name.localeCompare(right.name) || left.model.localeCompare(right.model))
+    .sort(
+      (left, right) => left.name.localeCompare(right.name) || left.model.localeCompare(right.model),
+    )
     .map((provider) => ({
       ref: encodeHmHarnessModelRef({ provider: provider.name, model: provider.model }),
       label: `${provider.name} / ${provider.model}`,
       resolvedModelLabel: provider.model,
     }));
   const refs = new Set(models.map(({ ref }) => ref.id));
-  if (refs.size !== models.length) throw new Error("HMHarness provider catalog contains duplicates");
+  if (refs.size !== models.length)
+    throw new Error("HMHarness provider catalog contains duplicates");
   const defaultModel =
     catalog.chat === null
       ? undefined

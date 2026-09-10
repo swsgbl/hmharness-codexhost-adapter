@@ -137,11 +137,12 @@ function parseBridgeJson(stdout: string): Record<string, unknown> {
     .map((entry) => entry.trim())
     .filter(Boolean)
     .at(-1);
-  if (!line) throw new HMHarnessBridgeError("HMHarness returned an empty result", {
-    code: "protocolError",
-    message: "HMHarness returned an empty result",
-    retryable: false,
-  });
+  if (!line)
+    throw new HMHarnessBridgeError("HMHarness returned an empty result", {
+      code: "protocolError",
+      message: "HMHarness returned an empty result",
+      retryable: false,
+    });
   try {
     const parsed: unknown = JSON.parse(line);
     if (typeof parsed !== "object" || parsed === null) throw new Error("invalid root");
@@ -180,14 +181,15 @@ async function processBridgeRunner(input: HMHarnessBridgeInput): Promise<HMHarne
       } else {
         child.kill("SIGTERM");
       }
-      reject(new HMHarnessBridgeError(message, { code, message, retryable: code !== "notInstalled" }));
+      reject(
+        new HMHarnessBridgeError(message, { code, message, retryable: code !== "notInstalled" }),
+      );
     };
     const timer = setTimeout(
       () => cancel("unavailable", `HMHarness command timed out after ${input.timeoutMs}ms`),
       input.timeoutMs,
     );
-    const abort = (): void =>
-      cancel("processExited", "HMHarness command was cancelled");
+    const abort = (): void => cancel("processExited", "HMHarness command was cancelled");
     input.signal?.addEventListener("abort", abort, { once: true });
     child.stdout?.on("data", (chunk: Buffer) => {
       stdout.push(chunk);
@@ -255,7 +257,10 @@ function bridgeEnvironment(
   };
 }
 
-function stateFor(model: HarnessModelRef | undefined, nativeRef: NativeSessionRef): HarnessSessionState {
+function stateFor(
+  model: HarnessModelRef | undefined,
+  nativeRef: NativeSessionRef,
+): HarnessSessionState {
   return {
     nativeRef,
     ...(model ? { effectiveModel: model } : {}),
@@ -392,7 +397,11 @@ class HMHarnessSession implements HarnessSession {
     if (!text.trim()) {
       return {
         ok: false,
-        error: { code: "invalidRequest", message: "HMHarness Turn must not be empty", retryable: false },
+        error: {
+          code: "invalidRequest",
+          message: "HMHarness Turn must not be empty",
+          retryable: false,
+        },
       };
     }
     const active: ActiveTurn = {
@@ -435,11 +444,17 @@ class HMHarnessSession implements HarnessSession {
 
   #selectModel(command: ModelSelectCommand): HarnessResult<ModelSelectCompleted> {
     if (this.#active) {
-      return { ok: false, error: { code: "sessionBusy", message: "HMHarness Turn is active", retryable: true } };
+      return {
+        ok: false,
+        error: { code: "sessionBusy", message: "HMHarness Turn is active", retryable: true },
+      };
     }
     const native = decodeHmHarnessModelRef(command.model);
     if (native.provider.includes("\u0000") || native.model.includes("\u0000")) {
-      return { ok: false, error: { code: "invalidRequest", message: "HMHarness Model is invalid", retryable: false } };
+      return {
+        ok: false,
+        error: { code: "invalidRequest", message: "HMHarness Model is invalid", retryable: false },
+      };
     }
     this.#model = command.model;
     this.#state = stateFor(this.#model, this.#nativeRef);
@@ -496,11 +511,7 @@ class HMHarnessSession implements HarnessSession {
         arguments: ["run"],
         cwd: this.#cwd,
         environment: {
-          ...bridgeEnvironment(
-            this.#environment,
-            this.#cwd,
-            nativeModel?.provider,
-          ),
+          ...bridgeEnvironment(this.#environment, this.#cwd, nativeModel?.provider),
           HMH_CODEXHOST_STREAM: "1",
         },
         stdin: prompt,
@@ -673,14 +684,18 @@ export class HMHarnessAdapter implements HarnessAdapter {
   #inspectionCache = new Map<string, HarnessInspection>();
   #inspectionInFlight = new Map<string, Promise<HarnessInspection>>();
 
-  constructor(options: HMHarnessAdapterOptions = {}, dependencies: HMHarnessAdapterDependencies = {}) {
+  constructor(
+    options: HMHarnessAdapterOptions = {},
+    dependencies: HMHarnessAdapterDependencies = {},
+  ) {
     this.#options = options;
     this.#runBridge = dependencies.runBridge ?? processBridgeRunner;
     this.#uuid = dependencies.randomUUID ?? randomUUID;
   }
 
   async inspect(input: InspectHarnessInput = {}): Promise<HarnessInspection> {
-    if (this.#closed) return { status: "unavailable", error: invalidState("HMHarness Adapter is closed") };
+    if (this.#closed)
+      return { status: "unavailable", error: invalidState("HMHarness Adapter is closed") };
     const cwd = path.resolve(input.cwd ?? process.cwd());
     if (!input.refresh) {
       const cached = this.#inspectionCache.get(cwd);
@@ -762,7 +777,10 @@ export class HMHarnessAdapter implements HarnessAdapter {
     }
     if (input.model) {
       const inspection = await this.inspect({ cwd: input.cwd });
-      if (inspection.status !== "ready" || !inspection.catalog.models.some(({ ref }) => ref.id === input.model?.id)) {
+      if (
+        inspection.status !== "ready" ||
+        !inspection.catalog.models.some(({ ref }) => ref.id === input.model?.id)
+      ) {
         return {
           ok: false,
           error: {

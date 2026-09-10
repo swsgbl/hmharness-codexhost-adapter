@@ -1,22 +1,33 @@
-# Upstream Merge Plan / 官方合并准备
+# Upstream Merge Status / 官方合并状态
 
 ## English
 
-1. Resolve the HMHarness bridge distribution path: publish a public package or choose a vendored source layout.
-2. Update `@hmharness/agent` and `@hmharness/kernel` dependencies to the current maintained release and rerun bridge tests.
-3. Create a clean branch from official CodexHost `main`; apply only the curated patch in this repository.
-4. Keep the upstream PR source/test only. Exclude local build products, global npm backups, temporary merge scripts, machine-specific paths, credentials, and runtime state.
-5. Resolve or explicitly document the MIT/Apache-2.0 declaration mismatch in HMHarness.
-6. Add CI for typecheck, the three targeted CodexHost suites, bridge `--version`, and provider listing without credentials.
-7. Attach a short live proof showing model selection, a completed Turn, bridge process exit, and no Thinking spinner after completion.
+Completed:
+
+1. Published `@hmharness/codexhost-bridge@0.5.2` to npm with MIT metadata and no `private` flag.
+2. Updated the HMHarness source bridge to `0.5.3` with matching runtime dependencies, tests, README, LICENSE, and publish preflight.
+3. Created a clean branch from official CodexHost `main` commit `25fb54f`.
+4. Verified TypeScript build, typecheck, lint, formatting, and 256 targeted tests.
+5. Submitted [CodexHost PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243).
+
+Next:
+
+1. Address upstream review feedback.
+2. Publish bridge `0.5.3` after completing npm web login, then verify `npm view` and a tarball install.
+3. If requested, add upstream CI covering adapter, projector, host runtime, renderer binding, plugin packaging, bridge `--version`, and provider listing without credentials.
 
 ## 中文
 
-1. 先解决 HM bridge 的分发方式：发布公开 npm 包，或确定 vendored 源码布局。
-2. 将 `@hmharness/agent` 和 `@hmharness/kernel` 依赖升级到当前维护版本，并复跑 bridge 测试。
-3. 从官方 CodexHost `main` 新建干净分支，只应用本仓库精选补丁。
-4. 官方 PR 只保留源码和测试，排除本地构建产物、全局 npm 备份、临时合并脚本、机器路径、凭据和运行状态。
-5. 解决或明确说明 HMHarness 中 MIT 与 Apache-2.0 声明不一致的问题。
-6. 增加 CI：typecheck、三组 CodexHost 定向测试、bridge `--version`、无凭据 provider 列表。
-7. 附上简短真实运行证据：模型可选择、Turn 完成、bridge 进程退出、完成后 UI 没有 Thinking 状态。
+已完成：
 
+1. `@hmharness/codexhost-bridge@0.5.2` 已公开发布到 npm，MIT 元数据正确，且不再是 private。
+2. HMHarness 源码中的 bridge 已升级到 `0.5.3`，运行依赖、测试、README、LICENSE 和发布预检均已补齐。
+3. 已从官方 CodexHost `main` 提交 `25fb54f` 创建干净分支。
+4. 已验证 TypeScript 构建、typecheck、lint、格式检查和 256 个定向测试。
+5. 已提交 [CodexHost PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243)。
+
+后续：
+
+1. 跟进官方 review 意见。
+2. 完成 npm web login 后发布 bridge `0.5.3`，再用 `npm view` 和 tarball 安装复核。
+3. 如官方需要，补充 adapter、projector、host runtime、renderer binding、插件打包、bridge `--version` 和无凭据 provider 列表的 CI。

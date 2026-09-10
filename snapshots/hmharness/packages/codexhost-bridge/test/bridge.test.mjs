@@ -19,7 +19,7 @@ function run(arguments_, options = {}) {
 test("bridge reports a machine-readable version", () => {
   const result = run(["--version"]);
   assert.equal(result.status, 0);
-  assert.deepEqual(JSON.parse(result.stdout), { version: "0.2.0" });
+  assert.deepEqual(JSON.parse(result.stdout), { version: "0.5.3" });
 });
 
 test("bridge reports providers without credentials", async () => {
