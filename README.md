@@ -51,15 +51,15 @@ npx vitest run --config tests/vitest.config.js \
   tests/release/production-renderer.test.mjs
 ```
 
-The bridge is publicly distributed as [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge). The current npm release is `0.6.1`; its official-registry tarball was installed and verified with a credential-free provider probe. The source snapshot preserved here is the verified `0.5.3` candidate from HMHarness commit `a72596f637035073221d41cb542b081e45bae543`; HMHarness `main` now carries the `0.6.1` bridge.
+The bridge is publicly distributed as [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge). The current npm release is `0.6.2`; its official-registry tarball was installed and verified with a credential-free provider probe. The source snapshot preserved here is the `0.6.2` release from HMHarness commit `f08e2d418eb0e184f14e3792640ab8221997ce7b`.
 
 Do not place a second `hmharness` plugin in CodexHost's user plugin directory; duplicate plugin IDs cause both plugins to be rejected.
 
 ### Upstream Status
 
 - [CodexHost PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243), based on official commit `25fb54f`, was closed because HMHarness is not currently in the CodexHost roadmap. No technical review or CI feedback was left.
-- `@hmharness/codexhost-bridge@0.6.1` is public on npm, is not private, declares MIT, and points to the correct monorepo subdirectory.
-- HMHarness `main` commit `3e8fedd6d39ae3177fa6d9bc91bf53bd6e97bfcc` carries the `0.6.1` bridge with matching `@hmharness/agent` and `@hmharness/kernel` dependencies.
+- `@hmharness/codexhost-bridge@0.6.2` is public on npm, is not private, declares MIT, and points to the correct monorepo subdirectory.
+- HMHarness `main` commit `f08e2d418eb0e184f14e3792640ab8221997ce7b` carries the `0.6.2` bridge with matching `@hmharness/agent` and `@hmharness/kernel` dependencies.
 - The PR excludes local build products, temporary scripts, machine paths, credentials, and runtime state.
 - This repository is maintained independently unless CodexHost later changes its roadmap.
 
@@ -67,9 +67,10 @@ Do not place a second `hmharness` plugin in CodexHost's user plugin directory; d
 
 On 2026-09-11:
 
-- CodexHost `0.6.2`, Codex CLI `0.154.0`, and bridge `0.6.1` were current.
-- Installed official npm tarball `0.6.1`: `--version` returned `{"version":"0.6.1"}`, the isolated provider listing returned `alt-model`, and the fake keys did not leak.
+- CodexHost `0.6.2`, Codex CLI `0.154.0`, and bridge `0.6.2` were current.
+- Installed official npm tarball `0.6.2`: `--version` returned `{"version":"0.6.2"}`, the isolated provider listing returned `alt-model`, and the fake keys did not leak.
 - Real CodexHost/HMHarness smoke: HMHarness was `ready`, all 13 configured models were listed, `glm / glm-5.3` was selected, two consecutive exact marker requests returned their exact values, the HM bridge process exited after each turn, and the visible Thinking count was zero. `selections.phase: locked` is the expected active external-thread ownership state; it did not block the follow-up turn.
+- Final source bridge `0.6.2`: Node tests passed `2/2`, provider listing returned all 13 configured entries without credentials, and a live GLM marker run returned `HMH_062_OK` with streaming deltas, an authoritative final record, and exit code `0`.
 
 On 2026-09-10:
 
@@ -137,17 +138,17 @@ npx vitest run --config tests/vitest.config.js \
   tests/release/production-renderer.test.mjs
 ```
 
-bridge 已在 npm 公开发布为 [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge)。当前 npm 版本是 `0.6.1`，官方源 tarball 已完成真实安装、`--version` 和无凭据 provider 输出验证；本仓库保留的来源快照是 HMHarness 提交 `a72596f637035073221d41cb542b081e45bae543` 上已验证的 `0.5.3` 候选，HMHarness `main` 当前已包含 `0.6.1` bridge。
+bridge 已在 npm 公开发布为 [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge)。当前 npm 版本是 `0.6.2`，官方源 tarball 已完成真实安装、`--version` 和无凭据 provider 输出验证；本仓库保留的来源快照是 HMHarness 提交 `f08e2d418eb0e184f14e3792640ab8221997ce7b` 上的 `0.6.2` 发布版本。
 
 不要把另一个 `hmharness` 插件放进 CodexHost 的用户插件目录；重复插件 ID 会导致两个插件同时被拒绝。
 
-### 是否建议合并到官方仓库
+### 官方状态与维护策略
 
 官方提案状态：
 
 - [CodexHost PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243) 基于官方提交 `25fb54f` 的干净分支，但维护者以 HMHarness 当前不在 CodexHost 计划中为由关闭；未留下技术 review 或 CI 反馈。
-- `@hmharness/codexhost-bridge@0.6.1` 已公开发布，非 private，MIT 许可，npm repository directory 指向正确。
-- HMHarness `main` 提交 `3e8fedd6d39ae3177fa6d9bc91bf53bd6e97bfcc` 中的 bridge 已升级为 `0.6.1`，并匹配 `@hmharness/agent` / `@hmharness/kernel` `0.6.1`。
+- `@hmharness/codexhost-bridge@0.6.2` 已公开发布，非 private，MIT 许可，npm repository directory 指向正确。
+- HMHarness `main` 提交 `f08e2d418eb0e184f14e3792640ab8221997ce7b` 中的 bridge 已升级为 `0.6.2`，并匹配 `@hmharness/agent` / `@hmharness/kernel` `0.6.2`。
 - PR 已排除本地构建产物、临时脚本、机器路径、凭据和运行状态。
 - 除非 CodexHost 路线图变化，本仓库按独立方案维护。
 
@@ -155,9 +156,10 @@ bridge 已在 npm 公开发布为 [`@hmharness/codexhost-bridge`](https://www.np
 
 2026-09-11：
 
-- CodexHost `0.6.2`、Codex CLI `0.154.0`、bridge `0.6.1` 均为当前版本。
-- npm 官方源 tarball `0.6.1` 真实验证：`--version` 返回 `{"version":"0.6.1"}`，隔离 provider 列表返回 `alt-model`，假 key 未泄露。
+- CodexHost `0.6.2`、Codex CLI `0.154.0`、bridge `0.6.2` 均为当前版本。
+- npm 官方源 tarball `0.6.2` 真实验证：`--version` 返回 `{"version":"0.6.2"}`，隔离 provider 列表返回 `alt-model`，假 key 未泄露。
 - 真实 CodexHost/HMHarness 冒烟：HMHarness 为 `ready`，列出全部 13 个已配置模型，选择 `glm / glm-5.3`，连续两个精确 marker 请求均返回精确结果，每个 turn 后 HM bridge 进程退出，可见“正在思考”计数为 0。`selections.phase: locked` 是活动外部线程的预期 ownership 状态，没有阻塞后续 turn。
+- 最终源码 bridge `0.6.2`：Node 测试通过 `2/2`，provider 列表返回全部 13 个已配置条目且未输出凭据；真实 GLM marker 请求返回 `HMH_062_OK`，包含流式 delta、权威 final 记录，退出码为 `0`。
 
 2026-09-10：
 

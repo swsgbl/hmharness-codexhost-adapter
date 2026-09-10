@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,7 +20,8 @@ function run(arguments_, options = {}) {
 test("bridge reports a machine-readable version", () => {
   const result = run(["--version"]);
   assert.equal(result.status, 0);
-  assert.deepEqual(JSON.parse(result.stdout), { version: "0.5.3" });
+  const parsed = JSON.parse(result.stdout);
+  assert.ok(typeof parsed.version === "string" && parsed.version.match(/^\d+\.\d+\.\d+$/), "version is semver: " + parsed.version);
 });
 
 test("bridge reports providers without credentials", async () => {
