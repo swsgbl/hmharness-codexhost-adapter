@@ -30,6 +30,7 @@
     "codexCliVersion": "0.154.0",
     "desktopVersion": "26.908.4834.0",
     "migrationScript": "scripts/apply-codexhost-0.7.1.mjs",
+    "windowsUserPluginInstaller": "tools/install-windows.ps1",
     "pluginBundle": "snapshots/codex-host-runtime/0.7.1/plugin",
     "pluginSha256": "57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A",
     "validatedOn": "2026-09-12",
@@ -40,7 +41,18 @@
     "postTurnThinkingCount": 0,
     "bridgeCleanup": "no HM bridge child process remained after the turn",
     "protectedListeners": "CC Switch 15721; codex-image-proxy 15731; pre-existing DSH Web 3081",
-    "migrationIdempotency": "syntax check passed; two consecutive applies returned success"
+    "migrationIdempotency": "syntax check passed; two consecutive applies returned success",
+    "windowsUserPluginPlacement": {
+      "path": "C:/Users/hongfu/.codexhost/plugins/hmharness",
+      "requiresControllerAndRendererMappings": true,
+      "duplicateRemovedFrom": "nested @codexhost/cli-win32-x64 app plugins",
+      "runId": "run_20260912154904_67851f",
+      "marker": "HMH_CODEXHOST_071_USERPLUGIN_20260912_OK",
+      "durationMs": 5850,
+      "outcome": "success/final",
+      "postTurnThinkingCount": 0,
+      "bridgeProcessRemaining": 0
+    }
   },
   "validation": {
     "codexHostTypecheck": "passed",
