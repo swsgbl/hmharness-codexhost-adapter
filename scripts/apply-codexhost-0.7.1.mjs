@@ -4,7 +4,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import process from "node:process";
 
-const expectedCodexHostVersion = "0.7.0";
+const expectedCodexHostVersion = "0.7.1";
 const harnessId = "hmharness";
 const repoRoot = join(import.meta.dirname, "..");
 const npmRoot = process.env.npm_config_prefix
@@ -35,7 +35,7 @@ function replaceOnce(source, search, replacement, label) {
   if (source.includes(replacement)) return source;
   const count = source.split(search).length - 1;
   if (count !== 1) {
-    throw new Error(`Expected one CodexHost 0.7.0 patch anchor for ${label}, found ${count}`);
+    throw new Error(`Expected one CodexHost 0.7.1 patch anchor for ${label}, found ${count}`);
   }
   return source.replace(search, replacement);
 }
@@ -44,7 +44,7 @@ function replaceExactCount(source, search, replacement, expectedCount, label) {
   if (source.includes(replacement)) return source;
   const count = source.split(search).length - 1;
   if (count !== expectedCount) {
-    throw new Error(`Expected ${expectedCount} CodexHost 0.7.0 patch anchors for ${label}, found ${count}`);
+    throw new Error(`Expected ${expectedCount} CodexHost 0.7.1 patch anchors for ${label}, found ${count}`);
   }
   return source.replaceAll(search, replacement);
 }

@@ -27,10 +27,12 @@ The bridge exits immediately after emitting the final line. The adapter treats t
   - Exact source and test files from the verified local integration.
 - `snapshots/hmharness/packages/codexhost-bridge/`
   - Exact source of the machine-readable HM bridge used by the adapter.
+- `snapshots/codex-host-runtime/0.7.1/plugin/`
+  - Runtime plugin bundle for the independently maintained CodexHost `0.7.1` integration.
+- `scripts/apply-codexhost-0.7.1.mjs`
+  - Idempotent migration for an official `@codexhost/cli@0.7.1` installation.
 - `snapshots/codex-host-runtime/0.7.0/plugin/`
-  - Runtime plugin bundle for the independently maintained CodexHost `0.7.0` integration.
-- `scripts/apply-codexhost-0.7.0.mjs`
-  - Idempotent migration for an official `@codexhost/cli@0.7.0` installation.
+  - Archived runtime plugin for the previous CodexHost `0.7.0` integration.
 - `manifest/provenance.json`
   - Commit IDs, hashes, patch applicability, and validation results.
 - `verification/`
@@ -59,17 +61,17 @@ The bridge is publicly distributed as [`@hmharness/codexhost-bridge`](https://ww
 
 Do not place a second `hmharness` plugin in CodexHost's user plugin directory; duplicate plugin IDs cause both plugins to be rejected.
 
-### Maintain CodexHost 0.7.0 At Runtime
+### Maintain CodexHost 0.7.1 At Runtime
 
 CodexHost's maintainers have said that HMHarness is outside their roadmap. For the independently maintained runtime integration, install the official host first and apply the local migration after every CodexHost update:
 
 ```powershell
-npm install -g @codexhost/cli@0.7.0
-node scripts/apply-codexhost-0.7.0.mjs
+npm install -g @codexhost/cli@0.7.1
+node scripts/apply-codexhost-0.7.1.mjs
 codexhost --version
 ```
 
-The migration validates that the plugin manifest uses the CodexHost `0.7.0` entry convention (`plugin.mjs`), copies the bundle into the official package's nested platform runtime, enables the plugin, and adds the renderer/controller model and ownership mappings. Close and relaunch CodexHost through its normal launcher after applying it.
+The migration validates that the plugin manifest uses the CodexHost `0.7.1` entry convention (`plugin.mjs`), copies the bundle into the official package's nested platform runtime, enables the plugin, and adds the renderer/controller model and ownership mappings. Close and relaunch CodexHost through its normal launcher after applying it. The current bundle was adapted from official upstream commit `e6adb05095aff8aba5241230b07619c8b8aa8db4`; its plugin SHA-256 is `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A`.
 
 ### Upstream Status
 
@@ -83,6 +85,9 @@ The migration validates that the plugin manifest uses the CodexHost `0.7.0` entr
 
 On 2026-09-12:
 
+- CodexHost `0.7.1`, its nested Windows platform package `0.7.1`, Codex CLI `0.154.0`, Desktop `26.908.4834.0`, and bridge `0.6.5` were current. The local integration was rebased onto official upstream commit `e6adb05095aff8aba5241230b07619c8b8aa8db4`; the TypeScript build passed and the targeted suite passed `270/270`.
+- The `0.7.1` migration was syntax-checked and executed twice as an idempotency test. HMHarness remained `ready`, listed 14 configured models, selected `glm / glm-5.3`, and returned real UI marker `HMH_CODEXHOST_071_20260912_OK`; the visible Thinking count returned to `0` and no HM bridge child process remained.
+- CC Switch on `127.0.0.1:15721`, codex-image-proxy on `127.0.0.1:15731`, and the pre-existing DSH Web instance on `3081` remained available. DeepSeek Harness was also returned to `ready` by two machine-local repairs: restoring its truncated official plugin from source and removing an invalid `codegraph` MCP reference plus extending its local startup wait to 60 seconds. Those DeepSeek files are not part of this HMHarness backup.
 - CodexHost `0.7.0`, its nested Windows platform package `0.7.0`, Codex CLI `0.154.0`, and bridge `0.6.5` were current. A stale top-level `@codexhost/cli-win32-x64@0.6.2` package was removed after confirming all live node-repl processes used the nested `0.7.0` path.
 - The first `0.7.0` migration exposed a real compatibility defect: the copied manifest still pointed at `./dist/plugin.js`, while the actual bundle and official plugin convention use `plugin.mjs`, producing `pluginLoad/loadFailed`. The manifest and migration were corrected and a complete desktop-shortcut relaunch returned HMHarness to `正常`.
 - HMHarness listed 14 configured models and selected `glm / glm-5.3`. A real UI turn sent `HMH_CODEXHOST_070_20260912_OK` and received a visible response containing that marker; after completion the composer was empty, the visible Thinking count was zero, and no HM bridge child process remained.
@@ -140,8 +145,9 @@ bridge 输出最终记录后立即退出。adapter 信任 `item.completed` 的�
 - `patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch`：只包含源码和测试的精选补丁，基准为官方 `main` 提交 `25fb54f2b91f0f4c488051287ffa813513c9a060`，即 [PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243)。
 - `snapshots/codex-host/`：已验证集成中涉及的 CodexHost 源码和测试文件。
 - `snapshots/hmharness/packages/codexhost-bridge/`：adapter 依赖的机器可读 bridge 实现。
-- `snapshots/codex-host-runtime/0.7.0/plugin/`：独立维护的 CodexHost `0.7.0` 运行时插件包。
-- `scripts/apply-codexhost-0.7.0.mjs`：面向官方 `@codexhost/cli@0.7.0` 安装的幂等迁移脚本。
+- `snapshots/codex-host-runtime/0.7.1/plugin/`：独立维护的 CodexHost `0.7.1` 运行时插件包。
+- `scripts/apply-codexhost-0.7.1.mjs`：面向官方 `@codexhost/cli@0.7.1` 安装的幂等迁移脚本。
+- `snapshots/codex-host-runtime/0.7.0/plugin/`：上一个 CodexHost `0.7.0` 运行时插件的归档。
 - `manifest/provenance.json`：来源提交、哈希、补丁可应用性和验证结果。
 - `verification/`：复现步骤和证据。
 
@@ -168,17 +174,17 @@ bridge 已在 npm 公开发布为 [`@hmharness/codexhost-bridge`](https://www.np
 
 不要把另一个 `hmharness` 插件放进 CodexHost 的用户插件目录；重复插件 ID 会导致两个插件同时被拒绝。
 
-### 维护 CodexHost 0.7.0 运行时
+### 维护 CodexHost 0.7.1 运行时
 
 CodexHost 官方已明确 HMHarness 不在其路线图内。独立维护的运行时集成应先安装官方宿主，再在每次 CodexHost 更新后应用本地迁移：
 
 ```powershell
-npm install -g @codexhost/cli@0.7.0
-node scripts/apply-codexhost-0.7.0.mjs
+npm install -g @codexhost/cli@0.7.1
+node scripts/apply-codexhost-0.7.1.mjs
 codexhost --version
 ```
 
-迁移脚本会校验插件 manifest 使用 CodexHost `0.7.0` 的入口约定（`plugin.mjs`），复制插件包到官方包内嵌的平台运行时，启用插件，并补齐 renderer/controller 的模型与 ownership 映射。应用后需要按正常启动器完整重启 CodexHost。
+迁移脚本会校验插件 manifest 使用 CodexHost `0.7.1` 的入口约定（`plugin.mjs`），复制插件包到官方包内嵌的平台运行时，启用插件，并补齐 renderer/controller 的模型与 ownership 映射。应用后需要按正常启动器完整重启 CodexHost。当前 bundle 基于官方上游提交 `e6adb05095aff8aba5241230b07619c8b8aa8db4` 适配；插件 SHA-256 为 `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A`。
 
 ### 官方状态与维护策略
 
@@ -194,6 +200,9 @@ codexhost --version
 
 2026-09-12：
 
+- CodexHost `0.7.1`、其内嵌 Windows 平台包 `0.7.1`、Codex CLI `0.154.0`、Desktop `26.908.4834.0`、bridge `0.6.5` 均为当前版本。本地集成已适配官方上游提交 `e6adb05095aff8aba5241230b07619c8b8aa8db4`；TypeScript 构建通过，目标测试 `270/270` 通过。
+- `0.7.1` 迁移脚本通过语法检查，并连续执行两次验证幂等。HMHarness 保持 `ready`，列出 14 个已配置模型，选择 `glm / glm-5.3`，真实 UI marker 返回 `HMH_CODEXHOST_071_20260912_OK`；完成后可见“正在思考”计数为 `0`，且没有 HM bridge 子进程残留。
+- `127.0.0.1:15721` 的 CC Switch、`127.0.0.1:15731` 的 codex-image-proxy、既有 `3081` DSH Web 实例均保持可用。DeepSeek Harness 也通过两项本机修复恢复 `ready`：从源码恢复被截断的官方插件，移除无效 `codegraph` MCP 引用并将本机启动等待延长到 60 秒。这些 DeepSeek 文件不属于本 HMHarness 备份。
 - CodexHost `0.7.0`、其内嵌 Windows 平台包 `0.7.0`、Codex CLI `0.154.0`、bridge `0.6.5` 均为当前版本；确认所有活跃 node-repl 进程都在使用内嵌 `0.7.0` 路径后，移除了顶层残留的 `@codexhost/cli-win32-x64@0.6.2`。
 - 首次 `0.7.0` 迁移暴露出真实兼容缺陷：复制的 manifest 仍指向 `./dist/plugin.js`，而实际 bundle 与官方插件约定都是 `plugin.mjs`，导致 `pluginLoad/loadFailed`。修正 manifest 和迁移脚本后，通过桌面快捷方式完整重启，HMHarness 恢复为 `正常`。
 - HMHarness 列出 14 个已配置模型，默认选择 `glm / glm-5.3`。真实 UI turn 发送 `HMH_CODEXHOST_070_20260912_OK` 并收到包含该 marker 的可见回复；完成后输入框为空，可见“正在思考”计数为 0，且没有 HM bridge 子进程残留。

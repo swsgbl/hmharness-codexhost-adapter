@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-12T11:15:00+08:00",
+  "generatedAt": "2026-09-12T14:23:36+08:00",
   "codexHost": {
     "upstream": "https://github.com/BytePioneer-AI/codex-host",
     "baseCommit": "25fb54f2b91f0f4c488051287ffa813513c9a060",
     "verifiedLocalHead": "3de8496200e3cad2ecf5cb934c54b58d1edf7446",
     "upstreamPullRequest": "https://github.com/BytePioneer-AI/codex-host/pull/243",
     "branch": "swsgbl:hmharness-adapter",
+    "runtimeUpstreamCommit": "e6adb05095aff8aba5241230b07619c8b8aa8db4",
     "patch": "patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch",
     "patchSha256": "B1C883BA217287F7F04C9CDDD1BFB89F4E753215BEC09BAC23A0263BC678C77F",
     "patchAppliesCleanlyToBaseCommit": true,
@@ -25,17 +26,21 @@
     "bridgeNpmTarballSha256": "9E0963B2C49454321CE96AE0ED281999506E7466296A72F4D5B36B913D198567"
   },
   "runtimeMaintenance": {
-    "codexHostVersion": "0.7.0",
+    "codexHostVersion": "0.7.1",
     "codexCliVersion": "0.154.0",
-    "desktopVersion": "26.903.9818.0",
-    "migrationScript": "scripts/apply-codexhost-0.7.0.mjs",
-    "pluginBundle": "snapshots/codex-host-runtime/0.7.0/plugin",
+    "desktopVersion": "26.908.4834.0",
+    "migrationScript": "scripts/apply-codexhost-0.7.1.mjs",
+    "pluginBundle": "snapshots/codex-host-runtime/0.7.1/plugin",
+    "pluginSha256": "57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A",
     "validatedOn": "2026-09-12",
     "pluginStatus": "normal",
     "modelCount": 14,
     "defaultModel": "glm / glm-5.3",
-    "realUiSendMarker": "HMH_CODEXHOST_070_20260912_OK",
-    "postTurnThinkingCount": 0
+    "realUiSendMarker": "HMH_CODEXHOST_071_20260912_OK",
+    "postTurnThinkingCount": 0,
+    "bridgeCleanup": "no HM bridge child process remained after the turn",
+    "protectedListeners": "CC Switch 15721; codex-image-proxy 15731; pre-existing DSH Web 3081",
+    "migrationIdempotency": "syntax check passed; two consecutive applies returned success"
   },
   "validation": {
     "codexHostTypecheck": "passed",
@@ -48,6 +53,9 @@
     "desktopUpdateSmoke": "CodexHost 0.6.2 / Desktop 26.903.9818.0 / CLI 0.154.0; 13 models listed; two exact 0.6.1 follow-up turns passed; no visible Thinking or Stop state",
     "bridge062Smoke": "Official npm tarball 0.6.2 returned its version and isolated alt-model provider without leaking fake keys; bridge tests passed 2/2; live GLM run returned HMH_062_OK with streaming deltas, an authoritative final record, and process exit 0",
     "bridge065Smoke": "Clean source bridge 0.6.5 at HMHarness commit b17e02f5c6d654c4a50bbe4c614164167cf9851a passed Node tests 2/2",
-    "codexHost070Smoke": "Desktop-shortcut launch returned HMHarness to normal; 14 models were listed with glm / glm-5.3 selected; a real UI turn returned marker HMH_CODEXHOST_070_20260912_OK; Thinking count returned to 0 and no HM bridge child process remained"
+    "codexHost070Smoke": "Desktop-shortcut launch returned HMHarness to normal; 14 models were listed with glm / glm-5.3 selected; a real UI turn returned marker HMH_CODEXHOST_070_20260912_OK; Thinking count returned to 0 and no HM bridge child process remained",
+    "codexHost071TargetedTests": "270/270 tests passed on the local integration based on upstream commit e6adb05095aff8aba5241230b07619c8b8aa8db4",
+    "codexHost071Smoke": "CodexHost 0.7.1 with Desktop 26.908.4834.0 listed 14 HM models, selected glm / glm-5.3, returned marker HMH_CODEXHOST_071_20260912_OK, ended with Thinking count 0, and left no HM bridge child process",
+    "deepSeekHarnessLocalRepair": "Restored a truncated official plugin, removed an invalid codegraph MCP reference, and locally extended startup wait to 60 seconds; final CodexHost status was ready. This repair is machine-local and is not included in the HMHarness backup"
   }
 }
