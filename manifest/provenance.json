@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-11T02:18:55+08:00",
+  "generatedAt": "2026-09-12T11:15:00+08:00",
   "codexHost": {
     "upstream": "https://github.com/BytePioneer-AI/codex-host",
     "baseCommit": "25fb54f2b91f0f4c488051287ffa813513c9a060",
@@ -16,13 +16,26 @@
   },
   "hmharness": {
     "upstream": "https://github.com/swsgbl/hmharness",
-    "repositoryCommit": "f08e2d418eb0e184f14e3792640ab8221997ce7b",
+    "repositoryCommit": "b17e02f5c6d654c4a50bbe4c614164167cf9851a",
     "bridgeSnapshot": "snapshots/hmharness/packages/codexhost-bridge",
-    "bridgeSourceVersion": "0.6.2",
-    "bridgeNpmLatestVersion": "0.6.2",
+    "bridgeSourceVersion": "0.6.5",
+    "bridgeNpmLatestVersion": "0.6.5",
     "bridgePackagePublishedOnNpm": true,
     "bridgeNpmLicense": "MIT",
-    "bridgeNpmTarballSha256": "9FB77DC159A6F2F6328525BD6EF1A251E1705A3C7105EEF78D32153E411D048C"
+    "bridgeNpmTarballSha256": "9E0963B2C49454321CE96AE0ED281999506E7466296A72F4D5B36B913D198567"
+  },
+  "runtimeMaintenance": {
+    "codexHostVersion": "0.7.0",
+    "codexCliVersion": "0.154.0",
+    "desktopVersion": "26.903.9818.0",
+    "migrationScript": "scripts/apply-codexhost-0.7.0.mjs",
+    "pluginBundle": "snapshots/codex-host-runtime/0.7.0/plugin",
+    "validatedOn": "2026-09-12",
+    "pluginStatus": "normal",
+    "modelCount": 14,
+    "defaultModel": "glm / glm-5.3",
+    "realUiSendMarker": "HMH_CODEXHOST_070_20260912_OK",
+    "postTurnThinkingCount": 0
   },
   "validation": {
     "codexHostTypecheck": "passed",
@@ -33,6 +46,8 @@
     "patchApplyCheck": "passed",
     "runtimeSmoke": "completed thread and turn; bridge exited; UI thinking count 0",
     "desktopUpdateSmoke": "CodexHost 0.6.2 / Desktop 26.903.9818.0 / CLI 0.154.0; 13 models listed; two exact 0.6.1 follow-up turns passed; no visible Thinking or Stop state",
-    "bridge062Smoke": "Official npm tarball 0.6.2 returned its version and isolated alt-model provider without leaking fake keys; bridge tests passed 2/2; live GLM run returned HMH_062_OK with streaming deltas, an authoritative final record, and process exit 0"
+    "bridge062Smoke": "Official npm tarball 0.6.2 returned its version and isolated alt-model provider without leaking fake keys; bridge tests passed 2/2; live GLM run returned HMH_062_OK with streaming deltas, an authoritative final record, and process exit 0",
+    "bridge065Smoke": "Clean source bridge 0.6.5 at HMHarness commit b17e02f5c6d654c4a50bbe4c614164167cf9851a passed Node tests 2/2",
+    "codexHost070Smoke": "Desktop-shortcut launch returned HMHarness to normal; 14 models were listed with glm / glm-5.3 selected; a real UI turn returned marker HMH_CODEXHOST_070_20260912_OK; Thinking count returned to 0 and no HM bridge child process remained"
   }
 }
