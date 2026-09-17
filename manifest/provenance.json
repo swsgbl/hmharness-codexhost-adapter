@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-15T02:00:09+08:00",
+  "generatedAt": "2026-09-18T01:57:15+08:00",
   "codexHost": {
     "upstream": "https://github.com/BytePioneer-AI/codex-host",
     "baseCommit": "25fb54f2b91f0f4c488051287ffa813513c9a060",
     "verifiedLocalHead": "3de8496200e3cad2ecf5cb934c54b58d1edf7446",
     "upstreamPullRequest": "https://github.com/BytePioneer-AI/codex-host/pull/243",
     "branch": "swsgbl:hmharness-adapter",
-    "runtimeUpstreamCommit": "969fbde59a927250448854b1ad4c78a2854cd4c5",
+    "runtimeUpstreamCommit": "4a431747f52fd3e0c021a116e6efff7f9039e172",
     "patch": "patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch",
     "patchSha256": "B1C883BA217287F7F04C9CDDD1BFB89F4E753215BEC09BAC23A0263BC678C77F",
     "patchAppliesCleanlyToBaseCommit": true,
@@ -26,30 +26,32 @@
     "bridgeNpmTarballSha256": "9E0963B2C49454321CE96AE0ED281999506E7466296A72F4D5B36B913D198567"
   },
   "runtimeMaintenance": {
-    "codexHostVersion": "0.8.2",
+    "codexHostVersion": "0.9.0",
     "codexHostDistribution": "official Windows installer",
     "codexHostNpmWrapperVersion": "0.8.0",
     "codexCliVersion": "0.154.0",
-    "desktopVersion": "26.908.8172.0",
-    "migrationScript": "scripts/apply-codexhost-0.8.2.mjs",
+    "desktopVersion": "26.911.7940.0",
+    "migrationScript": "scripts/apply-codexhost-0.9.0.mjs",
     "windowsUserPluginInstaller": "tools/install-windows.ps1",
-    "windowsFallbackLauncher": "tools/launch-windows-0.8.2.ps1",
-    "pluginBundle": "snapshots/codex-host-runtime/0.8.2/plugin",
+    "windowsFallbackLauncher": "tools/launch-windows-0.9.0.ps1",
+    "pluginBundle": "snapshots/codex-host-runtime/0.9.0/plugin",
     "pluginSha256": "57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A",
     "iconSha256": "950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF",
-    "validatedOn": "2026-09-15",
+    "validatedOn": "2026-09-18",
     "pluginStatus": "ready",
     "defaultModel": "glm / glm-5.3",
-    "realUiSendMarker": "HMH_CODEXHOST_082_UI_FINAL_20260915_OK",
-    "runId": "run_20260914175429_9b60c1",
-    "durationMs": 15451,
+    "realUiSendMarker": "HMH_CODEXHOST_090_20260918_OK",
+    "runId": "run_20260917175050_9b4a0c",
+    "durationMs": 25324,
     "outcome": "success/final",
     "iconRendered": "dedicated HMHarness SVG embedded in renderer; no Antigravity fallback",
-    "postInstallRestart": "ready; hmharness selected; glm / glm-5.3 exposed; dedicated icon rendered",
+    "postInstallRestart": "ready after cold start; hmharness selected; glm / glm-5.3 exposed; dedicated icon rendered",
     "postTurnThinkingCount": 0,
     "bridgeCleanup": "no HM bridge child process remained after the turn",
     "protectedListeners": "CC Switch 15721; codex-image-proxy 15731; pre-existing DSH Web 3081",
-    "migrationIdempotency": "syntax check passed; two consecutive 0.8.2 applies returned success",
+    "migrationIdempotency": "syntax check passed; two consecutive 0.9.0 applies returned success",
+    "upstreamTagObject": "63cf2697dd2b7e500d3677dadf6f01f29bf35777",
+    "rendererDeltas": "adds qoder and qoder-cn anchors plus restored plugin-thread ownership support",
     "windowsUserPluginPlacement": {
       "path": "C:/Users/hongfu/.codexhost/plugins/hmharness",
       "requiresControllerAndRendererMappings": true,
@@ -58,9 +60,11 @@
     "windowsFallbackRestore": {
       "shimExitedWithDesktop": true,
       "fallbackStateRemoved": true,
+      "restoreDelay": "approximately 5.5 seconds after shim exit",
       "hkcuEnvironmentRestored": true,
       "codexConfigResidual": "none"
-    }
+    },
+    "cdpPortPolicy": "discover the ChatGPT process listener; do not assume 59340 is stable across launches"
   },
   "validation": {
     "codexHostTypecheck": "passed",
@@ -78,6 +82,8 @@
     "codexHost071Smoke": "CodexHost 0.7.1 with Desktop 26.908.4834.0 listed 14 HM models, selected glm / glm-5.3, returned marker HMH_CODEXHOST_071_20260912_OK, ended with Thinking count 0, and left no HM bridge child process",
     "deepSeekHarnessLocalRepair": "Restored a truncated official plugin, removed an invalid codegraph MCP reference, and locally extended startup wait to 60 seconds; final CodexHost status was ready. This repair is machine-local and is not included in the HMHarness backup",
     "codexHost082Smoke": "CodexHost installer 0.8.2 with Desktop 26.908.8172.0 selected glm / glm-5.3, returned marker HMH_CODEXHOST_082_UI_FINAL_20260915_OK, rendered the dedicated HMHarness icon, ended with Thinking count 0, left no bridge process, and restored launch environment on shutdown",
-    "codexHost082Migration": "syntax check passed; two consecutive applies returned success; Windows placement moved the verified user plugin bundle and removed the installer duplicate; source bridge tests passed 2/2 from the HMHarness workspace"
+    "codexHost082Migration": "syntax check passed; two consecutive applies returned success; Windows placement moved the verified user plugin bundle and removed the installer duplicate; source bridge tests passed 2/2 from the HMHarness workspace",
+    "codexHost090Smoke": "CodexHost installer 0.9.0 with Desktop 26.911.7940.0 selected glm / glm-5.3, returned marker HMH_CODEXHOST_090_20260918_OK in run_20260917175050_9b4a0c, rendered the dedicated HMHarness icon on the live menu option, ended with Thinking count 0, left no bridge process, restored launch environment, and relaunch returned HMHarness to ready with the same model and icon",
+    "codexHost090Migration": "syntax check passed; two consecutive applies returned success; Windows placement moved the verified user plugin bundle, removed the installer duplicate, and preserved both plugin and icon SHA-256 values"
   }
 }

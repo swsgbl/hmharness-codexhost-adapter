@@ -8,11 +8,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $expectedPluginSha256 = '57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A'
 
-# Run scripts/apply-codexhost-0.8.2.mjs first on a clean installation. That
+# Run scripts/apply-codexhost-0.9.0.mjs first on a clean installation. That
 # migration installs the controller/renderer mappings; this helper moves only
 # the plugin bundle to CodexHost's user plugin directory.
 $expectedIconSha256 = '950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF'
-$pluginSource = Join-Path $PSScriptRoot '..\snapshots\codex-host-runtime\0.8.2\plugin'
+$pluginSource = Join-Path $PSScriptRoot '..\snapshots\codex-host-runtime\0.9.0\plugin'
 $pluginSource = [System.IO.Path]::GetFullPath($pluginSource)
 $requiredFiles = @(
     (Join-Path $pluginSource 'manifest.json')
@@ -61,8 +61,8 @@ if (-not (Test-Path -LiteralPath $distributionPath -PathType Leaf)) {
     throw "Cannot find CodexHost distribution metadata at: $distributionPath"
 }
 $distribution = Get-Content -LiteralPath $distributionPath -Raw | ConvertFrom-Json
-if ($distribution.version -ne '0.8.2') {
-    throw "This artifact is verified only with CodexHost 0.8.2; found $($distribution.version)."
+if ($distribution.version -ne '0.9.0') {
+    throw "This artifact is verified only with CodexHost 0.9.0; found $($distribution.version)."
 }
 
 $appPluginsResolved = (Resolve-Path -LiteralPath $AppPlugins).Path
@@ -124,7 +124,7 @@ if (Test-Path -LiteralPath $bundledPlugin -PathType Container) {
         throw "Refusing unexpected bundled plugin path: $bundledResolved"
     }
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $bundledBackup = Join-Path $BackupRoot "codexhost-082-hmharness-plugin-$stamp"
+    $bundledBackup = Join-Path $BackupRoot "codexhost-090-hmharness-plugin-$stamp"
     New-Item -ItemType Directory -Force -Path $bundledBackup | Out-Null
     Copy-Item -LiteralPath $bundledResolved -Destination $bundledBackup -Recurse
     Remove-Item -LiteralPath $bundledResolved -Recurse -Force
