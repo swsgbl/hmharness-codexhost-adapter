@@ -225,6 +225,12 @@ renderer = replaceOnce(
   `antigravity: void 0,\n        hmharness: void 0,\n        "kiro-cli": void 0,\n        codebuddy: void 0,\n        "cursor-cli": void 0,\n        hermes: void 0,\n        qoder: void 0,\n        "qoder-cn": void 0`,
   "Renderer initial HMHarness availability",
 );
+renderer = replaceOnce(
+  renderer,
+  `            } catch (error51) {\n              status = "error";\n              nextError = {\n                code: "internalError",\n                message: error51 instanceof Error ? error51.message : String(error51),\n                retryable: !(error51 instanceof RendererMethodUnavailableError),\n                stage: "request"\n              };\n            }`,
+  `            } catch (error51) {\n              const localBridgeWarming = hostId === "local" && error51 instanceof RendererMethodUnavailableError;\n              status = localBridgeWarming ? "checking" : "error";\n              nextError = {\n                code: "internalError",\n                message: error51 instanceof Error ? error51.message : String(error51),\n                retryable: localBridgeWarming || !(error51 instanceof RendererMethodUnavailableError),\n                stage: "request"\n              };\n            }`,
+  "Renderer local bridge startup retry",
+);
 
 await writeFile(rendererPath, renderer);
 console.log(
