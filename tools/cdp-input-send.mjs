@@ -67,7 +67,7 @@ await opened;
 await call("Runtime.enable");
 const newChatResult = await evaluate(`(() => {
   const button = [...document.querySelectorAll("button")]
-    .find((candidate) => candidate.getAttribute("aria-label") === "New chat" || candidate.innerText.trim() === "New chat");
+    .find((candidate) => ["New chat", "新对话"].includes(candidate.getAttribute("aria-label")) || ["New chat", "新对话"].includes(candidate.innerText.trim()));
   if (!button) return null;
   const rect = button.getBoundingClientRect();
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -117,7 +117,7 @@ if (status?.selections?.[0]?.agent !== "hmharness") {
 
 const focused = await evaluate(`(() => {
   const editor = [...document.querySelectorAll("[contenteditable=true]")]
-    .find((element) => element.getAttribute("aria-label") === "Do anything");
+    .find((element) => ["Do anything", "随心输入"].includes(element.getAttribute("aria-label")));
   if (!editor) throw new Error("Composer not found");
   editor.focus();
   const selection = window.getSelection();
@@ -130,9 +130,9 @@ await call("Input.insertText", { text: marker });
 await new Promise((resolve) => setTimeout(resolve, 100));
 const sendResult = await evaluate(`(() => {
   const editor = [...document.querySelectorAll("[contenteditable=true]")]
-    .find((element) => element.getAttribute("aria-label") === "Do anything");
+    .find((element) => ["Do anything", "随心输入"].includes(element.getAttribute("aria-label")));
   const send = [...document.querySelectorAll("button")]
-    .find((button) => button.getAttribute("aria-label") === "Send");
+    .find((button) => ["Send", "发送"].includes(button.getAttribute("aria-label")));
   if (!editor || !send) throw new Error("Composer controls not found");
   const rect = send.getBoundingClientRect();
   return {

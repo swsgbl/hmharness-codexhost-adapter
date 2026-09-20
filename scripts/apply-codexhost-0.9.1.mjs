@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -6,6 +7,73 @@ import process from "node:process";
 
 const expectedCodexHostVersion = "0.9.1";
 const harnessId = "hmharness";
+// Codex Host 0.9.1 ships zh-CN resources but may leave the remote i18n layer disabled.
+const rendererI18nGatePatch = `
+(() => {
+  const layerName = "72216192";
+  const marker = "__codexhostI18nGatePatch";
+  const descriptorsMarker = marker + "Descriptors";
+  function patchClient(client) {
+    if (!client || client[marker] || typeof client.getLayer !== "function") return;
+    const originalGetLayer = client.getLayer;
+    client.getLayer = function patchedGetLayer(name, options) {
+      const layer = originalGetLayer.call(this, name, options);
+      if (name !== layerName) return layer;
+      return {
+        ...layer,
+        get(key, fallback) {
+          if (key === "enable_i18n") return true;
+          if (key === "locale_source") return "IDE";
+          return typeof layer?.get === "function" ? layer.get(key, fallback) : fallback;
+        },
+      };
+    };
+    Object.defineProperty(client, marker, { value: true });
+  }
+  function patchNamespace(namespace) {
+    if (!namespace || typeof namespace !== "object") return;
+    if (!namespace[marker]) Object.defineProperty(namespace, marker, { value: true });
+    if (!namespace[descriptorsMarker]) {
+      Object.defineProperty(namespace, descriptorsMarker, { value: true });
+      for (const propertyName of ["firstInstance", "instance"]) {
+        let current = namespace[propertyName];
+        if (current) patchClient(current);
+        Object.defineProperty(namespace, propertyName, {
+          configurable: true,
+          enumerable: true,
+          get: () => current,
+          set: (client) => {
+            current = client;
+            patchClient(client);
+          },
+        });
+      }
+    }
+    for (const propertyName of ["firstInstance", "instance"]) patchClient(namespace[propertyName]);
+  }
+  if (window[marker]) return;
+  Object.defineProperty(window, marker, { value: true });
+  let statsigNamespace = window.__STATSIG__;
+  patchNamespace(statsigNamespace);
+  const poll = setInterval(() => {
+    if (statsigNamespace !== window.__STATSIG__) {
+      statsigNamespace = window.__STATSIG__;
+    }
+    patchNamespace(statsigNamespace);
+    const client = statsigNamespace?.firstInstance ?? statsigNamespace?.instance;
+    if (client?.[marker]) clearInterval(poll);
+  }, 5);
+  Object.defineProperty(window, "__STATSIG__", {
+    configurable: true,
+    enumerable: true,
+    get: () => statsigNamespace,
+    set: (namespace) => {
+      statsigNamespace = namespace;
+      patchNamespace(namespace);
+    },
+  });
+})();
+`;
 const repoRoot = join(import.meta.dirname, "..");
 const npmRoot = process.env.npm_config_prefix
   ? join(process.env.npm_config_prefix, process.platform === "win32" ? "" : "lib")
@@ -61,6 +129,21 @@ function replaceExactCount(source, search, replacement, expectedCount, label) {
     throw new Error(`Expected ${expectedCount} CodexHost 0.9.1 patch anchors for ${label}, found ${count}`);
   }
   return source.replaceAll(search, replacement);
+}
+
+function withRendererI18nGate(source) {
+  const prefix = `"use strict";\n`;
+  const appOpening = `\n(() => {\n`;
+  const patchOpening = `\n(() => {\n  const layerName = "72216192";`;
+  if (!source.startsWith(prefix)) throw new Error("CodexHost renderer has an unexpected prologue");
+  let body = source.slice(prefix.length);
+  if (body.startsWith(patchOpening)) {
+    const nextAppOpening = body.indexOf(appOpening, patchOpening.length);
+    if (nextAppOpening < 0) throw new Error("Unable to replace the existing renderer i18n gate patch");
+    body = body.slice(nextAppOpening);
+  }
+  if (!body.startsWith(appOpening)) throw new Error("CodexHost renderer i18n gate anchor was not found");
+  return prefix + rendererI18nGatePatch + body;
 }
 
 const installation = installationCandidates.find((candidate) => {
@@ -121,6 +204,7 @@ await writeFile(controllerPath, controller);
 
 const rendererPath = join(codexHostRoot, "app", "renderer-extension.js");
 let renderer = await readFile(rendererPath, "utf8");
+renderer = withRendererI18nGate(renderer);
 renderer = replaceOnce(
   renderer,
   `  // src/renderer-agent-icon.ts\n`,
@@ -197,6 +281,12 @@ renderer = replaceOnce(
 );
 renderer = replaceOnce(
   renderer,
+  `          availability: { ...activeHarnessAvailabilityState().availability },\n          selections,`,
+  `          availability: { ...activeHarnessAvailabilityState().availability },\n          errors: { ...activeHarnessAvailabilityState().errors },\n          selections,`,
+  "Renderer availability probe errors",
+);
+renderer = replaceOnce(
+  renderer,
   `if (inspection.harnessId === "kiro-cli" || inspection.harnessId === "codebuddy" || inspection.harnessId === "workbuddy" || inspection.harnessId === "cursor-cli") {`,
   `if (inspection.harnessId === "hmharness" || inspection.harnessId === "kiro-cli" || inspection.harnessId === "codebuddy" || inspection.harnessId === "workbuddy" || inspection.harnessId === "cursor-cli") {`,
   "Renderer restored plugin Thread ownership",
@@ -233,6 +323,15 @@ renderer = replaceOnce(
 );
 
 await writeFile(rendererPath, renderer);
+if (process.platform === "win32") {
+  const placementResult = spawnSync(
+    "pwsh",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", join(repoRoot, "tools", "install-windows.ps1")],
+    { stdio: "inherit" },
+  );
+  if (placementResult.error) throw placementResult.error;
+  if (placementResult.status !== 0) throw new Error(`HMHarness Windows placement failed with exit ${placementResult.status}`);
+}
 console.log(
   `Applied HMHarness to CodexHost ${expectedCodexHostVersion} (${installation.name}) at ${codexHostRoot}`,
 );
