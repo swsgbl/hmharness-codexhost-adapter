@@ -27,10 +27,14 @@ The bridge exits immediately after emitting the final line. The adapter treats t
   - Exact source and test files from the verified local integration.
 - `snapshots/hmharness/packages/codexhost-bridge/`
   - Exact source of the machine-readable HM bridge used by the adapter.
+- `snapshots/codex-host-runtime/0.9.1/plugin/`
+  - Runtime plugin bundle for the independently maintained CodexHost `0.9.1` integration, including the verified HMHarness icon.
+- `scripts/apply-codexhost-0.9.1.mjs`
+  - Idempotent migration for the official CodexHost `0.9.1` Windows installer layout.
 - `snapshots/codex-host-runtime/0.9.0/plugin/`
-  - Runtime plugin bundle for the independently maintained CodexHost `0.9.0` integration, including the verified HMHarness icon.
+  - Archived runtime plugin bundle for CodexHost `0.9.0`.
 - `scripts/apply-codexhost-0.9.0.mjs`
-  - Idempotent migration for the official CodexHost `0.9.0` Windows installer layout.
+  - Archived migration for CodexHost `0.9.0`.
 - `snapshots/codex-host-runtime/0.8.2/plugin/`
   - Archived runtime plugin bundle for CodexHost `0.8.2`.
 - `scripts/apply-codexhost-0.8.2.mjs`
@@ -41,8 +45,10 @@ The bridge exits immediately after emitting the final line. The adapter treats t
   - Archived migration for an official `@codexhost/cli@0.7.1` installation.
 - `tools/install-windows.ps1`
   - Optional Windows placement helper that moves the verified plugin bundle into CodexHost's user plugin directory after the migration mappings exist.
-- `tools/launch-windows-0.9.0.ps1`
+- `tools/launch-windows-0.9.1.ps1`
   - Windows fallback launcher for systems where Codex Desktop does not inherit the normal CodexHost process environment.
+- `tools/launch-windows-0.9.0.ps1`
+  - Archived CodexHost `0.9.0` fallback launcher.
 - `tools/launch-windows-0.8.2.ps1`
   - Archived 0.8.2 fallback launcher.
 - `snapshots/codex-host-runtime/0.7.0/plugin/`
@@ -75,30 +81,30 @@ The bridge is publicly distributed as [`@hmharness/codexhost-bridge`](https://ww
 
 Do not keep the same `hmharness` plugin in both the npm-managed plugin directory and the user plugin directory: duplicate plugin IDs cause both plugins to be rejected.
 
-### Maintain CodexHost 0.9.0 At Runtime
+### Maintain CodexHost 0.9.1 At Runtime
 
 CodexHost's maintainers have said that HMHarness is outside their roadmap. For the independently maintained runtime integration, install the official host first and apply the local migration after every CodexHost update:
 
 ```powershell
-# Install the official CodexHost 0.9.0 Windows installer release first.
-npm install -g @openai/codex@0.154.0
+# Install the official CodexHost 0.9.1 Windows installer release first.
+npm install -g @openai/codex@0.155.1
 npm install -g @hmharness/codexhost-bridge@0.6.5
-node scripts/apply-codexhost-0.9.0.mjs
+node scripts/apply-codexhost-0.9.1.mjs
 pwsh -NoProfile -ExecutionPolicy Bypass -File tools/install-windows.ps1  # optional Windows placement
 Get-Content "$env:LOCALAPPDATA\Programs\codexhost\app\codexhost-distribution.json"
 ```
 
-The current verified host is the official Windows installer distribution at `%LOCALAPPDATA%\Programs\codexhost`, version `0.9.0`, corresponding to upstream tag object `63cf2697dd2b7e500d3677dadf6f01f29bf35777` and peeled commit `4a431747f52fd3e0c021a116e6efff7f9039e172`. The public npm CLI may expose a different wrapper version (for example `0.8.0` on PATH while the installed host is `0.9.0`); always verify `app\codexhost-distribution.json` before applying a migration.
+The current verified host is the official Windows installer distribution at `%LOCALAPPDATA%\Programs\codexhost`, version `0.9.1`. The public npm CLI wrapper is also `0.9.1`; nevertheless, always verify `app\codexhost-distribution.json` before applying a migration because the PATH command and installed Desktop host can diverge.
 
-The 0.9.0 migration validates the `plugin.mjs` entry convention, copies the verified bundle into the host's plugin directory, enables it, and patches the controller and renderer anchors by exact count. CodexHost 0.9.0 adds `qoder` and `qoder-cn`, so the migration updates the exact agent arrays and preserves the renderer's restored plugin-thread ownership path for HMHarness. It also embeds the HMHarness SVG into the renderer so `hmharness` cannot fall back to the Antigravity icon. The plugin SHA-256 is `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF5C7094FDA4436A`; the icon SHA-256 is `950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF`. The Windows placement helper verifies both values.
+The 0.9.1 migration validates the `plugin.mjs` entry convention, copies the verified bundle into the host's plugin directory, enables it, and patches the controller and renderer anchors by exact count. It preserves the renderer's restored plugin-thread ownership path and the local request-bridge warmup retry. It also embeds the HMHarness SVG into the renderer so `hmharness` cannot fall back to the Antigravity icon. The plugin SHA-256 is `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF5C7094FDA4436A`; the icon SHA-256 is `950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF`. The Windows placement helper verifies both values.
 
 The migration validates that the plugin manifest uses the CodexHost `0.7.1` entry convention (`plugin.mjs`), copies the bundle into the official package's nested platform runtime, enables the plugin, and adds the renderer/controller model and ownership mappings. Close and relaunch CodexHost through its normal launcher after applying it. The current bundle was adapted from official upstream commit `e6adb05095aff8aba5241230b07619c8b8aa8db4`; its plugin SHA-256 is `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A`.
 
 On Windows, the optional placement helper may be run after the migration mappings are present. It moves only the plugin bundle to `~/.codexhost/plugins/hmharness`, enables that copy, and removes the duplicate from the nested npm runtime. It is not a standalone clean-install migration because the controller/renderer mappings are still required.
 
-For CodexHost 0.9.0, the placement helper removes the duplicate from the official installer plugin directory instead. On this Windows Insider/MSIX setup, Codex Desktop `26.911.7940.0` did not inherit CodexHost's environment injection. `tools/launch-windows-0.9.0.ps1` provides a scoped fallback: it snapshots seven HKCU environment values, writes temporary launch values, starts CodexHost with explicit node/shim/runtime/controller/renderer paths, waits for the Host shim to exit, then restores both HKCU and `~/.codex/config.toml`. A state file supports recovery from a stale shutdown. The desktop shortcut uses the official CodexHost executable icon and launches this script through WSH. CDP ports can change between launches, so discover the current ChatGPT listener instead of assuming one port.
+For CodexHost 0.9.1, the placement helper removes the duplicate from the official installer plugin directory. On this Windows Insider/MSIX setup, Codex Desktop did not inherit CodexHost's environment injection. `tools/launch-windows-0.9.1.ps1` provides a scoped fallback: it snapshots seven HKCU environment values, writes temporary launch values, starts CodexHost with explicit node/shim/runtime/controller/renderer paths, waits for the Host shim to exit, then restores both HKCU and `~/.codex/config.toml`. A state file supports recovery from a stale shutdown. The desktop shortcut uses the official CodexHost executable icon and launches this script through WSH. CDP ports can change between launches, so discover the current ChatGPT listener instead of assuming one port.
 
-Archived note: the two preceding placement/layout paragraphs describe the older 0.8.2 and 0.7.1 layouts. They do not override the 0.9.0 migration above; do not run archived migrations against CodexHost `0.9.0`.
+Archived note: the two preceding placement/layout paragraphs describe the older 0.8.2 and 0.7.1 layouts. They do not override the 0.9.1 migration above; do not run archived migrations against CodexHost `0.9.1`.
 
 ### Upstream Status
 
@@ -109,6 +115,14 @@ Archived note: the two preceding placement/layout paragraphs describe the older 
 - This repository is maintained independently unless CodexHost later changes its roadmap.
 
 ### Validation Snapshot
+
+On 2026-09-20:
+
+- CodexHost `0.9.1`, Codex CLI `0.155.1`, Codex Desktop `26.915.4065.0`, and bridge `0.6.5` were current. The Desktop package was updated from Microsoft DisplayCatalog/FE3's official x64 MSIX after Store UI delivery failed; its size, SHA-256, and Authenticode signature were verified.
+- The 0.9.1 migration was applied twice as an idempotency check. The placement helper installed one user plugin copy and removed the bundled duplicate. A cold Desktop launch initially showed the expected local-bridge warmup window, then returned `hmharness=ready`, `adapter.state=ready`, and dynamically discovered CDP port `56792`.
+- The live composer selected HMHarness and displayed `Model: glm / glm-5.3, glm-5.3`. Both the selected-agent trigger and the HMHarness menu option rendered the exact bundled SVG source, not the Antigravity fallback.
+- Real UI turns returned the `HMH_CODEXHOST_091_DESKTOP_20260920_OK` acknowledgement and exact final marker `HMH_CODEXHOST_091_DESKTOP_EXACT_20260920_OK` on `glm-5.3`. After each turn the composer was empty, visible Thinking count was `0`, and no `hmh-codexhost` process remained.
+- CC Switch on `127.0.0.1:15721`, codex-image-proxy on `127.0.0.1:15731`, and the other user processes were not stopped. The bridge test suite passed `2/2`.
 
 On 2026-09-18:
 
@@ -186,14 +200,17 @@ bridge 输出最终记录后立即退出。adapter 信任 `item.completed` 的�
 - `patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch`：只包含源码和测试的精选补丁，基准为官方 `main` 提交 `25fb54f2b91f0f4c488051287ffa813513c9a060`，即 [PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243)。
 - `snapshots/codex-host/`：已验证集成中涉及的 CodexHost 源码和测试文件。
 - `snapshots/hmharness/packages/codexhost-bridge/`：adapter 依赖的机器可读 bridge 实现。
-- `snapshots/codex-host-runtime/0.9.0/plugin/`：独立维护的 CodexHost `0.9.0` 运行时插件包，包含已验证的 HMHarness 图标。
-- `scripts/apply-codexhost-0.9.0.mjs`：面向官方 CodexHost `0.9.0` Windows installer 目录结构的幂等迁移脚本。
+- `snapshots/codex-host-runtime/0.9.1/plugin/`：独立维护的 CodexHost `0.9.1` 运行时插件包，包含已验证的 HMHarness 图标。
+- `scripts/apply-codexhost-0.9.1.mjs`：面向官方 CodexHost `0.9.1` Windows installer 目录结构的幂等迁移脚本。
+- `snapshots/codex-host-runtime/0.9.0/plugin/`：已归档的 CodexHost `0.9.0` 运行时插件包。
+- `scripts/apply-codexhost-0.9.0.mjs`：已归档的 CodexHost `0.9.0` 迁移脚本。
 - `snapshots/codex-host-runtime/0.8.2/plugin/`：独立维护的 CodexHost `0.8.2` 运行时插件包，包含已验证的 HMHarness 图标。
 - `scripts/apply-codexhost-0.8.2.mjs`：已归档的 CodexHost `0.8.2` 迁移脚本。
 - `snapshots/codex-host-runtime/0.7.1/plugin/`：已归档的 CodexHost `0.7.1` 运行时插件包。
 - `scripts/apply-codexhost-0.7.1.mjs`：已归档的官方 `@codexhost/cli@0.7.1` 迁移脚本。
 - `tools/install-windows.ps1`：可选的 Windows 插件位置辅助脚本，在迁移映射存在后把已验证插件包移动到 CodexHost 用户插件目录。
-- `tools/launch-windows-0.9.0.ps1`：面向 Codex Desktop 无法继承 CodexHost 进程环境的 Windows fallback 启动器。
+- `tools/launch-windows-0.9.1.ps1`：面向 Codex Desktop 无法继承 CodexHost 进程环境的 Windows fallback 启动器。
+- `tools/launch-windows-0.9.0.ps1`：已归档的 CodexHost `0.9.0` fallback 启动器。
 - `tools/launch-windows-0.8.2.ps1`：已归档的 `0.8.2` fallback 启动器。
 - `snapshots/codex-host-runtime/0.7.0/plugin/`：上一个 CodexHost `0.7.0` 运行时插件的归档。
 - `manifest/provenance.json`：来源提交、哈希、补丁可应用性和验证结果。
@@ -222,30 +239,30 @@ bridge 已在 npm 公开发布为 [`@hmharness/codexhost-bridge`](https://www.np
 
 不要把同一个 `hmharness` 插件同时留在 npm 管理插件目录和用户插件目录：重复插件 ID 会导致两个插件同时被拒绝。
 
-### 维护 CodexHost 0.9.0 运行时
+### 维护 CodexHost 0.9.1 运行时
 
 CodexHost 官方已明确 HMHarness 不在其路线图内。独立维护的运行时集成应先安装官方宿主，再在每次 CodexHost 更新后应用本地迁移：
 
 ```powershell
-# 先安装官方 CodexHost 0.9.0 Windows installer 发行版。
-npm install -g @openai/codex@0.154.0
+# 先安装官方 CodexHost 0.9.1 Windows installer 发行版。
+npm install -g @openai/codex@0.155.1
 npm install -g @hmharness/codexhost-bridge@0.6.5
-node scripts/apply-codexhost-0.9.0.mjs
+node scripts/apply-codexhost-0.9.1.mjs
 pwsh -NoProfile -ExecutionPolicy Bypass -File tools/install-windows.ps1  # Windows 可选位置迁移
 Get-Content "$env:LOCALAPPDATA\Programs\codexhost\app\codexhost-distribution.json"
 ```
 
-当前验证的宿主是 `%LOCALAPPDATA%\Programs\codexhost` 下的官方 Windows installer 发行版，版本为 `0.9.0`，对应上游 tag 对象 `63cf2697dd2b7e500d3677dadf6f01f29bf35777`、peeled commit `4a431747f52fd3e0c021a116e6efff7f9039e172`。npm CLI 可能显示不同的 wrapper 版本（例如 PATH 上的 `0.8.0`，而实际宿主是 `0.9.0`）；适配前必须读取 `app\codexhost-distribution.json` 确认宿主版本。
+当前验证的宿主是 `%LOCALAPPDATA%\Programs\codexhost` 下的官方 Windows installer 发行版，版本为 `0.9.1`；npm CLI wrapper 也是 `0.9.1`。PATH 命令和实际 Desktop 宿主仍可能分叉，适配前必须读取 `app\codexhost-distribution.json` 确认宿主版本。
 
-0.9.0 迁移脚本会校验 `plugin.mjs` 入口约定，复制已验证插件包，启用插件，并按 controller/renderer 的精确锚点补齐模型、ownership 和外部框架映射。CodexHost `0.9.0` 新增 `qoder` / `qoder-cn`，因此迁移脚本更新了精确数组锚点，并为 HMHarness 保留恢复插件线程 ownership 的路径。它还会把 HMHarness SVG 嵌入 renderer，确保 `hmharness` 不会回落到 Antigravity 图标。插件 SHA-256 为 `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF5C7094FDA4436A`，图标 SHA-256 为 `950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF`；Windows 位置辅助脚本会同时校验这两个值。
+0.9.1 迁移脚本会校验 `plugin.mjs` 入口约定，复制已验证插件包，启用插件，并按 controller/renderer 的精确锚点补齐模型、ownership 和外部框架映射。它保留恢复插件线程 ownership 的路径，也保留本地 request-bridge 预热重试处理；同时把 HMHarness SVG 嵌入 renderer，确保 `hmharness` 不会回落到 Antigravity 图标。插件 SHA-256 为 `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF5C7094FDA4436A`，图标 SHA-256 为 `950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF`；Windows 位置辅助脚本会同时校验这两个值。
 
 迁移脚本会校验插件 manifest 使用 CodexHost `0.7.1` 的入口约定（`plugin.mjs`），复制插件包到官方包内嵌的平台运行时，启用插件，并补齐 renderer/controller 的模型与 ownership 映射。应用后需要按正常启动器完整重启 CodexHost。当前 bundle 基于官方上游提交 `e6adb05095aff8aba5241230b07619c8b8aa8db4` 适配；插件 SHA-256 为 `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A`。
 
 Windows 可在迁移映射存在后运行可选的位置辅助脚本。它只把插件包移动到 `~/.codexhost/plugins/hmharness`，启用该副本，并移除内嵌 npm 运行时里的重复副本。controller/renderer 映射仍然必需，因此它不是干净的独立安装方案。
 
-CodexHost 0.9.0 的位置辅助脚本会移除官方 installer 插件目录里的重复副本。在这台 Windows Insider/MSIX 环境上，Codex Desktop `26.911.7940.0` 没有继承 CodexHost 的环境注入；`tools/launch-windows-0.9.0.ps1` 提供范围受限的 fallback：先快照 7 个 HKCU 环境值，写入临时启动值，用显式 node/shim/runtime/controller/renderer 路径启动 CodexHost，等待 Host shim 退出，再恢复 HKCU 和 `~/.codex/config.toml`。状态文件支持异常关机后的下次恢复。桌面快捷方式使用官方 CodexHost 可执行文件图标，并通过 WSH 调用该脚本。CDP 端口可能在多次启动间变化，应发现当前 ChatGPT 监听端口，不能固定假设某个端口。
+CodexHost 0.9.1 的位置辅助脚本会移除官方 installer 插件目录里的重复副本。在这台 Windows Insider/MSIX 环境上，Codex Desktop 没有继承 CodexHost 的环境注入；`tools/launch-windows-0.9.1.ps1` 提供范围受限的 fallback：先快照 7 个 HKCU 环境值，写入临时启动值，用显式 node/shim/runtime/controller/renderer 路径启动 CodexHost，等待 Host shim 退出，再恢复 HKCU 和 `~/.codex/config.toml`。状态文件支持异常关机后的下次恢复。桌面快捷方式使用官方 CodexHost 可执行文件图标，并通过 WSH 调用该脚本。CDP 端口可能在多次启动间变化，应发现当前 ChatGPT 监听端口，不能固定假设某个端口。
 
-已归档说明：上面两段位置/布局说明描述旧的 `0.8.2` 与 `0.7.1` 布局，不覆盖前面的 `0.9.0` 迁移；不要对 CodexHost `0.9.0` 运行旧迁移脚本。
+已归档说明：上面两段位置/布局说明描述旧的 `0.8.2` 与 `0.7.1` 布局，不覆盖前面的 `0.9.1` 迁移；不要对 CodexHost `0.9.1` 运行旧迁移脚本。
 
 ### 官方状态与维护策略
 
@@ -258,6 +275,14 @@ CodexHost 0.9.0 的位置辅助脚本会移除官方 installer 插件目录里�
 - 除非 CodexHost 路线图变化，本仓库按独立方案维护。
 
 ### 验证记录
+
+2026-09-20：
+
+- CodexHost `0.9.1`、Codex CLI `0.155.1`、Codex Desktop `26.915.4065.0`、bridge `0.6.5` 均为当前版本。微软商店 UI 交付失败后，改用 Microsoft DisplayCatalog/FE3 返回的官方 x64 MSIX 更新 Desktop；文件大小、SHA-256 和 Authenticode 签名均已验证。
+- 0.9.1 迁移脚本连续执行两次验证幂等；位置辅助脚本只保留用户插件副本并移除 installer 目录重复副本。冷启动先出现预期的本地桥接预热窗口，随后 `hmharness=ready`、`adapter.state=ready`，本次动态 CDP 端口为 `56792`。
+- 真实输入框选择 HMHarness，模型按钮为 `Model: glm / glm-5.3, glm-5.3`。当前 Agent 按钮和 HMHarness 菜单项都渲染完整匹配的专用 SVG，不是 Antigravity 回落图标。
+- 两次真实 UI turn 分别返回 `HMH_CODEXHOST_091_DESKTOP_20260920_OK` 确认和精确最终 marker `HMH_CODEXHOST_091_DESKTOP_EXACT_20260920_OK`，模型为 `glm-5.3`。每次完成后输入框为空、可见“正在思考”计数为 `0`、没有 `hmh-codexhost` 进程残留。
+- CC Switch `127.0.0.1:15721`、codex-image-proxy `127.0.0.1:15731` 和其它用户进程未被停止；bridge 测试通过 `2/2`。
 
 2026-09-18：
 
