@@ -7,15 +7,31 @@ import process from "node:process";
 
 const expectedCodexHostVersion = "0.9.1";
 const harnessId = "hmharness";
-// Codex Host 0.9.1 ships zh-CN resources but may leave the remote i18n layer disabled.
+// Codex Host 0.9.1 ships zh-CN resources but may leave remote feature controls disabled.
 const rendererI18nGatePatch = `
 (() => {
   const layerName = "72216192";
   const marker = "__codexhostI18nGatePatch";
   const descriptorsMarker = marker + "Descriptors";
+  const enabledGateNames = new Set(["410065390", "3097504420"]);
   function patchClient(client) {
     if (!client || client[marker] || typeof client.getLayer !== "function") return;
     const originalGetLayer = client.getLayer;
+    const originalCheckGate = client.checkGate;
+    if (typeof originalCheckGate === "function") {
+      client.checkGate = function patchedCheckGate(name, options) {
+        const value = originalCheckGate.call(this, name, options);
+        return enabledGateNames.has(name) ? true : value;
+      };
+    }
+    const originalGetFeatureGate = client.getFeatureGate;
+    if (typeof originalGetFeatureGate === "function") {
+      client.getFeatureGate = function patchedGetFeatureGate(name, options) {
+        const gate = originalGetFeatureGate.call(this, name, options);
+        if (!enabledGateNames.has(name) || gate == null) return gate;
+        return { ...gate, value: true };
+      };
+    }
     client.getLayer = function patchedGetLayer(name, options) {
       const layer = originalGetLayer.call(this, name, options);
       if (name !== layerName) return layer;
@@ -146,6 +162,45 @@ function withRendererI18nGate(source) {
   return prefix + rendererI18nGatePatch + body;
 }
 
+async function ensureChromeExtensionHostConfig() {
+  if (process.platform !== "win32") return;
+
+  const codexHome = join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".codex");
+  const manifestPath = join(codexHome, "chrome-native-hosts-v2.json");
+  if (!existsSync(manifestPath)) return;
+
+  const manifest = await readJson(manifestPath);
+  const entry = manifest.entries?.find((candidate) => {
+    const extensionHostPath = candidate?.paths?.extensionHostPath;
+    return typeof extensionHostPath === "string" && extensionHostPath.startsWith(join(codexHome, "plugins", "cache"));
+  });
+  if (!entry) return;
+
+  const paths = entry.paths;
+  if (!existsSync(paths.extensionHostPath)) return;
+  const requiredPaths = [
+    paths.browserClientPath,
+    paths.codexCliPath,
+    paths.nodePath,
+    paths.nodeReplPath,
+  ];
+  if (requiredPaths.some((path) => typeof path !== "string" || !existsSync(path))) return;
+
+  const configPath = join(dirname(paths.extensionHostPath), "extension-host-config.json");
+  const config = {
+    schemaVersion: 1,
+    channel: entry.channel,
+    browserClientPath: paths.browserClientPath,
+    codexCliPath: paths.codexCliPath,
+    nodePath: paths.nodePath,
+    nodeReplPath: paths.nodeReplPath,
+    proxyHost: paths.proxyHost ?? entry.proxyHost ?? "127.0.0.1",
+    proxyPort: paths.proxyPort ?? entry.proxyPort ?? 0,
+  };
+  await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  console.log(`Restored the Chrome extension host config at ${configPath}`);
+}
+
 const installation = installationCandidates.find((candidate) => {
   const appRoot = join(candidate.root, "app");
   return ["codexhost-distribution.json", "plugins/enabled.json", "desktop-controller.mjs", "renderer-extension.js"].every(
@@ -158,6 +213,7 @@ if (!installation) {
 }
 const codexHostRoot = installation.root;
 requireVersion(join(codexHostRoot, "app", "codexhost-distribution.json"), expectedCodexHostVersion);
+await ensureChromeExtensionHostConfig();
 
 const pluginRoot = join(codexHostRoot, "app", "plugins", harnessId);
 const pluginSourceRoot = join(repoRoot, "snapshots", "codex-host-runtime", expectedCodexHostVersion, "plugin");

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-21T00:03:41+08:00",
+  "generatedAt": "2026-09-25T08:06:40+08:00",
   "codexHost": {
     "upstream": "https://github.com/BytePioneer-AI/codex-host",
     "baseCommit": "25fb54f2b91f0f4c488051287ffa813513c9a060",
@@ -25,37 +25,36 @@
     "bridgeNpmTarballSha256": "9E0963B2C49454321CE96AE0ED281999506E7466296A72F4D5B36B913D198567"
   },
   "runtimeMaintenance": {
-    "codexHostVersion": "0.9.1",
+    "codexHostVersion": "0.10.0",
     "codexHostDistribution": "official Windows installer",
-    "codexHostNpmWrapperVersion": "0.9.1",
-    "codexCliVersion": "0.155.1",
-    "desktopVersion": "26.915.4065.0",
-    "migrationScript": "scripts/apply-codexhost-0.9.1.mjs",
+    "codexHostNpmWrapperVersion": "0.10.0",
+    "codexCliVersion": "0.156.1",
+    "desktopVersion": "26.917.9434.0",
+    "migrationScript": "scripts/apply-codexhost-0.10.0.mjs",
     "windowsUserPluginInstaller": "tools/install-windows.ps1",
-    "windowsFallbackLauncher": "tools/launch-windows-0.9.1.ps1",
-    "pluginBundle": "snapshots/codex-host-runtime/0.9.1/plugin",
+    "windowsFallbackLauncher": "tools/launch-windows-0.10.0.ps1",
+    "pluginBundle": "snapshots/codex-host-runtime/0.10.0/plugin",
     "pluginSha256": "57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A",
     "iconSha256": "950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF",
-    "validatedOn": "2026-09-20",
+    "validatedOn": "2026-09-25",
     "pluginStatus": "ready",
     "defaultModel": "glm / glm-5.3",
-    "realUiSendMarker": "HMH_CODEXHOST_091_DESKTOP_EXACT_20260920_OK",
-    "realUiSessions": "2026-09-20T15-57-31-pty8a8; 2026-09-20T15-58-35-vpwuup",
-    "hostThreads": "fb6739b9-886e-46ec-b188-f53abda6e34d; 38939e2e-f54b-4d15-80c0-76d88dc21913",
+    "realUiSendMarker": "HMH_CODEXHOST_0100_20260925_FINAL",
+    "realUiSessions": "2026-09-25 cold Desktop session",
     "outcome": "success/final",
     "iconRendered": "dedicated HMHarness SVG embedded in renderer; no Antigravity fallback",
     "postInstallRestart": "ready after cold-start request-bridge warmup; hmharness selected; glm / glm-5.3 exposed; dedicated icon rendered",
     "postTurnThinkingCount": 0,
     "bridgeCleanup": "no HM bridge child process remained after the turn",
     "protectedListeners": "CC Switch 15721; codex-image-proxy 15731; HM Web; Hermes; pre-existing DSH Web 3081",
-    "migrationIdempotency": "syntax check passed; two consecutive 0.9.1 applies returned success",
-    "rendererDeltas": "maps the current 0.9.1 agent arrays, preserves request-bridge warmup retry and plugin-thread ownership, and embeds the dedicated icon",
-    "desktopUpdatePackage": "OpenAI.Codex 26.915.4065.0 from Microsoft DisplayCatalog/FE3 x64 MSIX",
-    "desktopMsixSizeBytes": 824570408,
-    "desktopMsixSha256": "FB4745F5378C8A4122F74643A3C7C1000DA5F4B184F0D9DC9FAF275C79AC73A4",
-    "desktopAuthenticodeSignature": "valid; issued by Microsoft Marketplace CA G 027",
+    "migrationIdempotency": "syntax check passed; repeated 0.10.0 applies returned success with renderer SHA-256 860D572067D6698F2FA458269866BD12B03EB1C0D4A1098CF1774DCBB05C3300",
+    "rendererDeltas": "maps the current 0.10.0 agent arrays, preserves request-bridge warmup retry and plugin-thread ownership, embeds the dedicated icon, and installs an idempotent i18n gate patch",
+    "desktopUpdatePackage": "OpenAI.Codex 26.917.9434.0; installed package status Ok",
+    "desktopMsixSizeBytes": null,
+    "desktopMsixSha256": null,
+    "desktopAuthenticodeSignature": "not rehashed for this incremental verification",
     "rendererReadiness": "availability.hmharness=ready; adapter.state=ready; adapter.modelUpdates=1; hook=request-bridge",
-    "rendererCdpPort": "56792 for this launch only; discover the current ChatGPT listener dynamically",
+    "rendererCdpPort": "52324 for this launch only; discover the current ChatGPT listener dynamically",
     "windowsUserPluginPlacement": {
       "path": "C:/Users/hongfu/.codexhost/plugins/hmharness",
       "requiresControllerAndRendererMappings": true,
@@ -68,7 +67,16 @@
       "hkcuEnvironmentRestored": true,
       "codexConfigResidual": "none"
     },
-    "cdpPortPolicy": "discover the ChatGPT process listener; do not assume 59340 is stable across launches"
+    "cdpPortPolicy": "discover the ChatGPT process listener; do not assume 59340 is stable across launches",
+    "chromeExtension": {
+      "version": "1.26.901.11451",
+      "extensionId": "hehggadaopoacecdllhhajmbjkdcmajg",
+      "chromeNativeHostManifestCorrect": true,
+      "edgeNativeHostManifestCorrect": true,
+      "isolatedSidePanelRendered": "ChatGPT is ready",
+      "nativeHostLaunchPath": "C:/Users/hongfu/.codex/extension-host-no-codexhost.cmd after an isolated cold restart",
+      "existingUserChromeCacheNote": "an already-running user Chrome retains its startup manifest cache and must be restarted to load the wrapper"
+    }
   },
   "validation": {
     "codexHostTypecheck": "passed",
@@ -90,6 +98,9 @@
     "codexHost090Smoke": "CodexHost installer 0.9.0 with Desktop 26.911.7940.0 selected glm / glm-5.3, returned marker HMH_CODEXHOST_090_20260918_OK in run_20260917175050_9b4a0c, rendered the dedicated HMHarness icon on the live menu option, ended with Thinking count 0, left no bridge process, restored launch environment, and relaunch returned HMHarness to ready with the same model and icon",
     "codexHost090Migration": "syntax check passed; two consecutive applies returned success; Windows placement moved the verified user plugin bundle, removed the installer duplicate, and preserved both plugin and icon SHA-256 values",
     "codexHost091Smoke": "CodexHost installer 0.9.1 with Desktop 26.915.4065.0 and Codex CLI 0.155.1 selected HMHarness and glm / glm-5.3, rendered the dedicated icon, returned exact marker HMH_CODEXHOST_091_DESKTOP_EXACT_20260920_OK from the real composer, ended with Thinking count 0, and left no hmh-codexhost process",
-    "codexHost091Migration": "syntax check passed; two consecutive applies returned success; Windows placement moved the verified user plugin bundle, removed the installer duplicate, and preserved both plugin and icon SHA-256 values"
+    "codexHost091Migration": "syntax check passed; two consecutive applies returned success; Windows placement moved the verified user plugin bundle, removed the installer duplicate, and preserved both plugin and icon SHA-256 values",
+    "codexHost100Smoke": "CodexHost 0.10.0 with Desktop 26.917.9434.0 and global Codex CLI 0.156.1 selected HMHarness and glm / glm-5.3, rendered the dedicated icon and zh-CN UI, returned exact marker HMH_CODEXHOST_0100_20260925_FINAL, ended with Thinking count 0, and left no hmh-codexhost process",
+    "codexHost100Migration": "syntax check passed; repeated applies returned success with a stable renderer hash; Windows placement retained one user plugin copy, removed the installer duplicate, and preserved both committed hashes",
+    "chromeExtension100Smoke": "ChatGPT extension 1.26.901.11451 passed Chrome and Edge native-host manifest checks; an isolated cold Chrome restart loaded the extension and launched extension-host.exe through extension-host-no-codexhost.cmd; the side panel page rendered ChatGPT is ready"
   }
 }
