@@ -7,7 +7,9 @@ if (!port || !marker) {
 }
 
 const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-const page = pages.find((candidate) => candidate.type === "page" && candidate.url.startsWith("app://"));
+const page = pages.find(
+  (candidate) => candidate.type === "page" && candidate.url === "app://-/index.html",
+);
 if (!page) throw new Error("Codex Desktop page was not found through CDP");
 
 const websocket = new WebSocket(page.webSocketDebuggerUrl);

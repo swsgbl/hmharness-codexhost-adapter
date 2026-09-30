@@ -1,0 +1,262 @@
+diff --git a/crates/launcher/src/main.rs b/crates/launcher/src/main.rs
+index 94ecbb58..df2f645a 100644
+--- a/crates/launcher/src/main.rs
++++ b/crates/launcher/src/main.rs
+@@ -32,7 +32,8 @@ use active_update::start_pending_update;
+ use active_update::update_waiting_for_launcher_exit;
+ #[cfg(target_os = "windows")]
+ use codexhost_platform::{
+-    APPX_RESUME_ARGUMENT, DesktopProcess, launch_desktop, resume_packaged_application,
++    APPX_RESUME_ARGUMENT, DesktopProcess, desktop_helper_proxy_environment, launch_desktop,
++    resume_packaged_application,
+ };
+ use codexhost_platform::{
+     DesktopIdentity, DesktopInstallation, DesktopLaunchMode, SupervisedChild,
+@@ -782,8 +783,11 @@ fn supervise_desktop(
+     descriptor_path: &Path,
+ ) -> Result<(), Box<dyn Error>> {
+     startup_trace("launching Codex Desktop");
++    let helper_proxy_environment = desktop_helper_proxy_environment();
++    let mut desktop_arguments = desktop_arguments.to_vec();
++    desktop_arguments.extend(windows_desktop_proxy_arguments(&helper_proxy_environment));
+     let desktop_arguments =
+-        desktop_path_overrides::launch_arguments(desktop_arguments, environment);
++        desktop_path_overrides::launch_arguments(&desktop_arguments, environment);
+     let mut desktop = launch_desktop(
+         installation,
+         &options.shim,
+@@ -794,7 +798,9 @@ fn supervise_desktop(
+     startup_trace("Codex Desktop launched");
+     let desktop_pid = desktop.id();
+     wait_for_launched_desktop_ownership(installation, &mut desktop, Duration::from_secs(5))?;
+-    let mut controller = match start_desktop_controller(options, control, environment) {
++    let controller_environment =
++        windows_controller_environment(environment, &helper_proxy_environment);
++    let mut controller = match start_desktop_controller(options, control, &controller_environment) {
+         Ok(started) => started,
+         Err(error) => {
+             let _ = desktop.kill();
+@@ -914,6 +920,57 @@ fn desktop_environment(
+     environment
+ }
+ 
++#[cfg(target_os = "windows")]
++fn windows_controller_environment(
++    desktop_environment: &[(OsString, OsString)],
++    helper_proxy_environment: &[(OsString, OsString)],
++) -> Vec<(OsString, OsString)> {
++    let mut controller_environment = desktop_environment.to_vec();
++    controller_environment.extend_from_slice(helper_proxy_environment);
++    controller_environment
++}
++
++#[cfg(target_os = "windows")]
++fn windows_desktop_proxy_arguments(proxy_environment: &[(OsString, OsString)]) -> Vec<OsString> {
++    let value = |names: &[&str]| {
++        names.iter().find_map(|name| {
++            proxy_environment
++                .iter()
++                .find(|(candidate, _)| candidate == name)
++                .map(|(_, value)| value.to_string_lossy().into_owned())
++        })
++    };
++
++    let proxy = value(&["ALL_PROXY", "all_proxy"])
++        .or_else(|| value(&["HTTPS_PROXY", "https_proxy"]))
++        .or_else(|| value(&["HTTP_PROXY", "http_proxy"]))
++        .filter(|value| !value.is_empty());
++    let Some(proxy) = proxy else {
++        return Vec::new();
++    };
++
++    let mut arguments = vec![OsString::from(format!("--proxy-server={proxy}"))];
++    let mut bypass = value(&["NO_PROXY", "no_proxy"])
++        .map(|value| {
++            value
++                .split(',')
++                .map(str::trim)
++                .map(str::to_owned)
++                .collect::<Vec<_>>()
++        })
++        .unwrap_or_default();
++    for host in ["<local>", "localhost", "127.0.0.1", "::1"] {
++        if !bypass.iter().any(|entry| entry.eq_ignore_ascii_case(host)) {
++            bypass.push(host.to_owned());
++        }
++    }
++    arguments.push(OsString::from(format!(
++        "--proxy-bypass-list={}",
++        bypass.join(";")
++    )));
++    arguments
++}
++
+ /// Forward absolute npm update paths. AppX and LaunchServices do not inherit
+ /// the Launcher process environment.
+ fn npm_update_runtime_environment(
+@@ -1282,6 +1339,10 @@ mod tests {
+     use super::wait_for_controller_ready;
+     #[cfg(target_os = "windows")]
+     use super::wait_for_desktop_exit;
++    #[cfg(target_os = "windows")]
++    use super::windows_controller_environment;
++    #[cfg(target_os = "windows")]
++    use super::windows_desktop_proxy_arguments;
+     use super::{
+         CONTROL_NONCE_ENV, CONTROL_PORT_ENV, DEFAULT_AGENT_ENV, HOST_NODE_PATH_ENV,
+         LAUNCHER_EXECUTABLE_ENV, LAUNCHER_PID_ENV, NPM_CLI_PATH_ENV, NPM_LAUNCHER_PATH_ENV,
+@@ -1663,6 +1724,154 @@ mod tests {
+         )));
+     }
+ 
++    #[cfg(target_os = "windows")]
++    #[test]
++    fn windows_proxy_variables_reach_only_the_desktop_controller() {
++        const MARKER: &str = "CODEXHOST_TEST_DESKTOP_PROXY_ENVIRONMENT";
++        if std::env::var_os(MARKER).is_none() {
++            let output = Command::new(std::env::current_exe().expect("test executable"))
++                .args([
++                    "--exact",
++                    "tests::windows_proxy_variables_reach_only_the_desktop_controller",
++                    "--nocapture",
++                ])
++                .env(MARKER, "1")
++                .env("HTTP_PROXY", "http://127.0.0.1:3128")
++                .env("HTTPS_PROXY", "http://127.0.0.1:3128")
++                .output()
++                .expect("run isolated proxy environment test");
++            assert!(
++                output.status.success(),
++                "{}{}",
++                String::from_utf8_lossy(&output.stdout),
++                String::from_utf8_lossy(&output.stderr),
++            );
++            return;
++        }
++
++        let desktop_environment = desktop_environment(
++            &resolved_options(),
++            &runtime_control(),
++            Path::new(r"C:\codexhost.exe"),
++            Path::new(r"C:\Users\Codex\AppData\Local\codexhost\desktop-runtime-v1.json"),
++            None,
++        );
++        assert!(
++            !desktop_environment.iter().any(|(name, _)| matches!(
++                name.to_str(),
++                Some(
++                    "HTTP_PROXY"
++                        | "HTTPS_PROXY"
++                        | "http_proxy"
++                        | "https_proxy"
++                        | "ALL_PROXY"
++                        | "all_proxy"
++                        | "NO_PROXY"
++                        | "no_proxy"
++                        | "NODE_USE_ENV_PROXY"
++                )
++            )),
++            "AppX Desktop must continue using the Windows system proxy"
++        );
++
++        let environment = windows_controller_environment(
++            &desktop_environment,
++            &[
++                (
++                    OsString::from("HTTP_PROXY"),
++                    OsString::from("http://127.0.0.1:3128"),
++                ),
++                (
++                    OsString::from("http_proxy"),
++                    OsString::from("http://127.0.0.1:3128"),
++                ),
++                (
++                    OsString::from("HTTPS_PROXY"),
++                    OsString::from("http://127.0.0.1:3128"),
++                ),
++                (
++                    OsString::from("https_proxy"),
++                    OsString::from("http://127.0.0.1:3128"),
++                ),
++                (
++                    OsString::from("NO_PROXY"),
++                    OsString::from("localhost,127.0.0.1,::1"),
++                ),
++                (
++                    OsString::from("no_proxy"),
++                    OsString::from("localhost,127.0.0.1,::1"),
++                ),
++                (OsString::from("NODE_USE_ENV_PROXY"), OsString::from("1")),
++            ],
++        );
++        for name in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"] {
++            assert!(
++                environment.contains(&(
++                    OsString::from(name),
++                    OsString::from("http://127.0.0.1:3128"),
++                )),
++                "missing Desktop proxy environment {name}"
++            );
++        }
++        let no_proxy = environment
++            .into_iter()
++            .find(|(name, _)| *name == OsString::from("NO_PROXY"))
++            .map(|(_, value)| value.to_string_lossy().into_owned())
++            .unwrap_or_default();
++        for host in ["localhost", "127.0.0.1", "::1"] {
++            assert!(
++                no_proxy.split(',').any(|value| value == host),
++                "NO_PROXY must retain {host}: {no_proxy}"
++            );
++        }
++    }
++
++    #[cfg(target_os = "windows")]
++    #[test]
++    fn windows_desktop_proxy_arguments_prefer_a_single_chromium_proxy() {
++        let arguments = windows_desktop_proxy_arguments(&[
++            (
++                OsString::from("HTTP_PROXY"),
++                OsString::from("http://ignored:80"),
++            ),
++            (
++                OsString::from("HTTPS_PROXY"),
++                OsString::from("http://ignored:443"),
++            ),
++            (
++                OsString::from("ALL_PROXY"),
++                OsString::from("socks5://127.0.0.1:1080"),
++            ),
++            (
++                OsString::from("NO_PROXY"),
++                OsString::from("internal.example, localhost ,127.0.0.1"),
++            ),
++        ]);
++
++        assert_eq!(
++            arguments,
++            [
++                OsString::from("--proxy-server=socks5://127.0.0.1:1080"),
++                OsString::from(
++                    "--proxy-bypass-list=internal.example;localhost;127.0.0.1;<local>;::1"
++                ),
++            ]
++        );
++    }
++
++    #[cfg(target_os = "windows")]
++    #[test]
++    fn windows_desktop_proxy_arguments_are_omitted_without_an_active_proxy() {
++        assert!(
++            windows_desktop_proxy_arguments(&[
++                (OsString::from("HTTP_PROXY"), OsString::new()),
++                (OsString::from("HTTPS_PROXY"), OsString::new()),
++                (OsString::from("ALL_PROXY"), OsString::new()),
++            ])
++            .is_empty()
++        );
++    }
++
+     #[test]
+     fn desktop_environment_preserves_explicit_native_home_and_profile() {
+         const MARKER: &str = "CODEXHOST_TEST_DESKTOP_PATH_OVERRIDES";

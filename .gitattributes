@@ -1,3 +1,4 @@
 *.patch -text
+patches/**/*.patch -diff -text
 snapshots/**/plugin.mjs -diff -text
 snapshots/**/assets/icon.svg -diff -text
