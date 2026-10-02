@@ -6,13 +6,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$expectedCodexHostVersion = '0.12.0'
 $expectedPluginSha256 = '57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A'
 
-# Run scripts/apply-codexhost-0.10.2.mjs first on a clean installation. That
-# migration installs the controller/renderer mappings; this helper moves only
-# the plugin bundle to CodexHost's user plugin directory.
+# For CodexHost 0.12.0, this helper places only the user plugin. Run the
+# versioned migration first because the renderer/controller agent lists still
+# require the independently maintained runtime anchors.
 $expectedIconSha256 = '950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF'
-$pluginSource = Join-Path $PSScriptRoot '..\snapshots\codex-host-runtime\0.10.2\plugin'
+$pluginSource = Join-Path $PSScriptRoot '..\snapshots\codex-host-runtime\0.12.0\plugin'
 $pluginSource = [System.IO.Path]::GetFullPath($pluginSource)
 $requiredFiles = @(
     (Join-Path $pluginSource 'manifest.json')
@@ -28,10 +29,21 @@ foreach ($file in $requiredFiles) {
 if ([string]::IsNullOrWhiteSpace($AppPlugins)) {
     $installerPlugins = Join-Path $env:LOCALAPPDATA 'Programs\codexhost\app\plugins'
     $npmPlugins = Join-Path $env:APPDATA 'npm\node_modules\@codexhost\cli\node_modules\@codexhost\cli-win32-x64\app\plugins'
-    $AppPlugins = if (Test-Path -LiteralPath $installerPlugins -PathType Container) {
-        $installerPlugins
+    $candidates = @($npmPlugins, $installerPlugins) | Where-Object {
+        Test-Path -LiteralPath $_ -PathType Container
+    }
+    $matchingVersion = @($candidates) | Where-Object {
+        $candidateDistribution = Join-Path $_ '..\codexhost-distribution.json'
+        if (Test-Path -LiteralPath $candidateDistribution -PathType Leaf) {
+            (Get-Content -LiteralPath $candidateDistribution -Raw | ConvertFrom-Json).version -eq $expectedCodexHostVersion
+        } else {
+            $false
+        }
+    }
+    $AppPlugins = if ($matchingVersion.Count -gt 0) {
+        @($matchingVersion)[0]
     } else {
-        $npmPlugins
+        $candidates | Select-Object -First 1
     }
 }
 if (-not (Test-Path -LiteralPath $AppPlugins -PathType Container)) {
@@ -61,8 +73,8 @@ if (-not (Test-Path -LiteralPath $distributionPath -PathType Leaf)) {
     throw "Cannot find CodexHost distribution metadata at: $distributionPath"
 }
 $distribution = Get-Content -LiteralPath $distributionPath -Raw | ConvertFrom-Json
-if ($distribution.version -ne '0.10.2') {
-    throw "This artifact is verified only with CodexHost 0.10.2; found $($distribution.version)."
+if ($distribution.version -ne $expectedCodexHostVersion) {
+    throw "This artifact is verified only with CodexHost $expectedCodexHostVersion; found $($distribution.version)."
 }
 
 $appPluginsResolved = (Resolve-Path -LiteralPath $AppPlugins).Path
@@ -124,7 +136,7 @@ if (Test-Path -LiteralPath $bundledPlugin -PathType Container) {
         throw "Refusing unexpected bundled plugin path: $bundledResolved"
     }
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $bundledBackup = Join-Path $BackupRoot "codexhost-0102-hmharness-plugin-$stamp"
+    $bundledBackup = Join-Path $BackupRoot "codexhost-0120-hmharness-plugin-$stamp"
     New-Item -ItemType Directory -Force -Path $bundledBackup | Out-Null
     Copy-Item -LiteralPath $bundledResolved -Destination $bundledBackup -Recurse
     Remove-Item -LiteralPath $bundledResolved -Recurse -Force
