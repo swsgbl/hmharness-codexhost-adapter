@@ -27,14 +27,20 @@ The bridge exits immediately after emitting the final line. The adapter treats t
   - Exact source and test files from the verified local integration.
 - `snapshots/hmharness/packages/codexhost-bridge/`
   - Exact source of the machine-readable HM bridge used by the adapter.
+- `snapshots/hmharness/packages/codexhost-bridge-0.23.20/`
+  - Exact runtime bridge source snapshot verified with CodexHost `0.12.1`, from HMHarness commit `d16bb0d692ffaa838edf2b2f4ac2d8a61e9a7eec`.
 - `snapshots/hmharness/packages/codexhost-bridge-0.23.13/`
-  - Exact runtime bridge source snapshot verified with CodexHost `0.12.0`, from HMHarness commit `a8025d9ec5511a6297323166e3545e9a561daeef`.
+  - Archived runtime bridge snapshot verified with CodexHost `0.12.0`.
+- `snapshots/codex-host-runtime/0.12.1/plugin/`
+  - Runtime plugin bundle for the independently maintained CodexHost `0.12.1` integration, including the verified HMHarness icon and textual Item completion fix.
+- `scripts/apply-codexhost-0.12.1.mjs`
+  - Exact-anchor migration for the official CodexHost `0.12.1` npm nested Windows runtime layout.
+- `tools/launch-windows-0.12.1.ps1`
+  - Current Windows fallback launcher for CodexHost `0.12.1`.
 - `snapshots/codex-host-runtime/0.12.0/plugin/`
-  - Runtime plugin bundle for the independently maintained CodexHost `0.12.0` integration, including the verified HMHarness icon.
-- `scripts/apply-codexhost-0.12.0.mjs`
-  - Exact-anchor migration for the official CodexHost `0.12.0` npm nested Windows runtime layout.
-- `tools/launch-windows-0.12.0.ps1`
-  - Current Windows fallback launcher for CodexHost `0.12.0`.
+  - Archived CodexHost `0.12.0` runtime plugin bundle.
+- `scripts/apply-codexhost-0.12.0.mjs` and `tools/launch-windows-0.12.0.ps1`
+  - Archived CodexHost `0.12.0` migration and launcher.
 - `snapshots/codex-host-runtime/0.10.2/plugin/`
   - Archived runtime plugin bundle for the CodexHost `0.10.2` integration.
 - `scripts/apply-codexhost-0.10.2.mjs`
@@ -43,7 +49,7 @@ The bridge exits immediately after emitting the final line. The adapter treats t
   - Archived CodexHost `0.10.2` Windows fallback launcher.
 - `patches/codex-host/windows-0.10.2-launcher-proxy.patch`
   - Launcher source patch that gives Chromium an explicit managed proxy while keeping local Host/model traffic loopback-only.
-- `tools/cdp-eval.mjs`, `tools/cdp-input-send.mjs`, `tools/cdp-locale.mjs`, `tools/cdp-renderer-diagnose.mjs`
+- `tools/cdp-eval.mjs`, `tools/cdp-main-evaluate.mjs`, `tools/cdp-main-input.mjs`, `tools/cdp-input-send.mjs`, `tools/cdp-locale.mjs`, `tools/cdp-renderer-diagnose.mjs`
   - CDP probes that select only the exact `app://-/index.html` main renderer and ignore Desktop 26.924's hidden avatar-overlay target.
 - `snapshots/codex-host-runtime/0.10.1/plugin/`
   - Archived runtime plugin bundle for CodexHost `0.10.1`.
@@ -105,31 +111,33 @@ npx vitest run --config tests/vitest.config.js \
   tests/release/production-renderer.test.mjs
 ```
 
-The bridge is publicly distributed as [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge). The runtime verified with CodexHost `0.12.0` is `0.23.13`; its exact package source is preserved at `snapshots/hmharness/packages/codexhost-bridge-0.23.13/`. The original `snapshots/hmharness/packages/codexhost-bridge/` path remains the historical `0.6.5` source snapshot from clean HMHarness commit `b17e02f5c6d654c4a50bbe4c614164167cf9851a`.
+The bridge is publicly distributed as [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge). The runtime verified with CodexHost `0.12.1` is `0.23.20`; its exact package source is preserved at `snapshots/hmharness/packages/codexhost-bridge-0.23.20/`. The original `snapshots/hmharness/packages/codexhost-bridge/` path remains the historical `0.6.5` source snapshot from clean HMHarness commit `b17e02f5c6d654c4a50bbe4c614164167cf9851a`.
 
 Do not keep the same `hmharness` plugin in both the npm-managed plugin directory and the user plugin directory: duplicate plugin IDs cause both plugins to be rejected.
 
-### Maintain CodexHost 0.12.0 At Runtime
+### Maintain CodexHost 0.12.1 At Runtime
 
 CodexHost's maintainers have said that HMHarness is outside their roadmap. For the independently maintained runtime integration, install the official host first and apply the local migration after every CodexHost update:
 
 ```powershell
-# Install the official CodexHost 0.12.0 release first.
-npm install -g @codexhost/cli@0.12.0
+# Install the official CodexHost 0.12.1 release first.
+npm install -g @codexhost/cli@0.12.1
 npm install -g @openai/codex@0.160.0
-npm install -g @hmharness/codexhost-bridge@0.23.13
-node scripts/apply-codexhost-0.12.0.mjs
+npm install -g @hmharness/codexhost-bridge@0.23.20
+node scripts/apply-codexhost-0.12.1.mjs
 pwsh -NoProfile -ExecutionPolicy Bypass -File tools/install-windows.ps1  # optional standalone placement check
 Get-Content "$env:APPDATA\npm\node_modules\@codexhost\cli\node_modules\@codexhost\cli-win32-x64\app\codexhost-distribution.json"
 ```
 
-The 0.12.0 migration keeps the official user-plugin mechanism: the verified bundle is installed at `~/.codexhost/plugins/hmharness` and enabled through `~/.codexhost/plugins/enabled.json`. CodexHost still hard-codes the renderer/controller agent allowlists, so the migration adds only the missing HMHarness anchors for agent visibility, model routing, restored ownership, labels, install links, transport routing, and the dedicated SVG icon. The plugin SHA-256 is `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A`; the icon SHA-256 is `950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF`. The Windows placement helper verifies both values but is not a standalone migration because the renderer/controller anchors remain required.
+The 0.12.1 migration keeps the official user-plugin mechanism: the verified bundle is installed at `~/.codexhost/plugins/hmharness` and enabled through `~/.codexhost/plugins/enabled.json`. CodexHost still hard-codes the renderer/controller agent allowlists, so the migration adds only the missing HMHarness anchors for agent visibility, model routing, restored ownership, labels, install links, transport routing, and the dedicated SVG icon. The plugin SHA-256 is `877D0A17F9483E8DBA4BE0585BBF9C1EA25F38D8F0432A9B5C4308C7F7DFFF36`; the icon SHA-256 is `950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF`. The Windows placement helper verifies both values but is not a standalone migration because the renderer/controller anchors remain required.
+
+CodexHost 0.12.1 validates that a textual Item's completion equals the accumulated `text.append` stream. HMHarness can emit interim progress before its authoritative final record, so the plugin now closes that interim Item with the streamed text, starts a second `agentMessage`, completes it with the bridge's final text, and includes both snapshots in `turn.completed`. This keeps streaming progress visible without tripping Host's `Host textual Item completion does not match its append updates` invariant.
 
 The renderer still loads its locale catalog only when remote Statsig controls enable i18n; `--lang=zh-CN` alone does not force the visible catalog. The migration therefore carries forward the exact production-bundle i18n gate patch and forces the two CodexHost locale gates while leaving all other remote values unchanged. This patch is idempotent and is a local boundary patch, not a replacement for the official user-plugin loader.
 
-The current verified host is the npm nested Windows platform package at `%APPDATA%\npm\node_modules\@codexhost\cli\node_modules\@codexhost\cli-win32-x64`, version `0.12.0`. Always verify `app\codexhost-distribution.json` before applying a migration because the PATH command and installed Desktop host can diverge. The 0.12.0 launcher dynamically resolves `node.exe` from PATH, requires Node.js 22 or newer, and uses `windows-0120-launch-fallback.json` plus versioned `env-0120-launch-*` backups for shutdown recovery.
+The current verified host is the npm nested Windows platform package at `%APPDATA%\npm\node_modules\@codexhost\cli\node_modules\@codexhost\cli-win32-x64`, version `0.12.1`. Always verify `app\codexhost-distribution.json` before applying a migration because the PATH command and installed Desktop host can diverge. The 0.12.1 launcher dynamically resolves `node.exe` from PATH, requires Node.js 22 or newer, and uses `windows-0121-launch-fallback.json` plus versioned `env-0121-launch-*` backups for shutdown recovery.
 
-On Codex Desktop `26.928.3736.0`, the launcher still applies the managed-proxy behavior introduced by `patches/codex-host/windows-0.10.2-launcher-proxy.patch`: Chromium receives one explicit proxy with loopback bypass while Host/model traffic remains loopback-only. CDP probes must attach to the exact `app://-/index.html` main page; Desktop can also expose an avatar-overlay target, which must not receive composer input.
+On Codex Desktop `26.928.4866.0`, the launcher still applies the managed-proxy behavior introduced by `patches/codex-host/windows-0.10.2-launcher-proxy.patch`: Chromium receives one explicit proxy with loopback bypass while Host/model traffic remains loopback-only. CDP probes must attach to the exact `app://-/index.html` main page; Desktop can also expose an avatar-overlay target, which must not receive composer input.
 
 Archived CodexHost `0.10.2` and older runtime notes follow.
 
@@ -150,12 +158,20 @@ Archived note: the two preceding placement/layout paragraphs describe the older 
 ### Upstream Status
 
 - [CodexHost PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243), based on official commit `25fb54f`, was closed because HMHarness is not currently in the CodexHost roadmap. No technical review or CI feedback was left.
-- `@hmharness/codexhost-bridge@0.23.13` is public on npm, is not private, declares MIT, and points to the correct monorepo subdirectory.
-- The current runtime bridge snapshot is `0.23.13` from HMHarness commit `a8025d9ec5511a6297323166e3545e9a561daeef`; the original PR-era snapshot remains `0.6.5` from commit `b17e02f5c6d654c4a50bbe4c614164167cf9851a`.
+- `@hmharness/codexhost-bridge@0.23.20` is public on npm, is not private, declares MIT, and points to the correct monorepo subdirectory.
+- The current runtime bridge snapshot is `0.23.20` from HMHarness commit `d16bb0d692ffaa838edf2b2f4ac2d8a61e9a7eec`; the original PR-era snapshot remains `0.6.5` from commit `b17e02f5c6d654c4a50bbe4c614164167cf9851a`.
 - The PR excludes local build products, temporary scripts, machine paths, credentials, and runtime state.
 - This repository is maintained independently unless CodexHost later changes its roadmap.
 
 ### Validation Snapshot
+
+On 2026-10-04:
+
+- CodexHost `0.12.1`, global Codex CLI `0.160.0`, bridge `0.23.20`, and Codex Desktop `26.928.4866.0` were current. npm confirmed `0.12.1`, `0.160.0`, and `0.23.20` as the latest published versions.
+- The 0.12.1 migration passed JavaScript syntax checking and repeated application with renderer SHA-256 `78A834A056EA076C4FBBC84B08A6ABF6E6BB3C1E8D72A417B24A9FAD592ED0B9` and controller SHA-256 `A3E8F0624BBC8FF07666C00DA1437A3981ADB41B76817572FD808B6DB8AA53E5`. Only the official user-plugin copy remained; its plugin hash was `877D0A17F9483E8DBA4BE0585BBF9C1EA25F38D8F0432A9B5C4308C7F7DFFF36`.
+- A cold launch through `Desktop\CodexHost.lnk` exposed dynamic CDP port `51130`, selected HMHarness with `glm / glm-5.3`, and rendered ten exact HMHarness icon nodes with nine visible.
+- A short marker and the original low-watch-timeout delegation path both completed. Delegation `45ffb4b9-c041-41af-a46e-bcd4695def7b` completed child Claude Code thread `c5a62f7c-4e0d-4eca-9f0c-6f964d77066d`, returned exact marker `HMH_CODEXHOST_0121_MISMATCH_FIX_DELEGATION_20261004_012500`, and added the expected parent turnMappings after the watch-expiry notification. The final Thinking and Stop counts were both `0`, the composer was empty, and no bridge process remained.
+- Bridge `0.23.20` tests passed `2/2`, `--version` returned the expected JSON, and the npm payload matched the local bridge files line-for-line after npm line-ending normalization.
 
 On 2026-10-03:
 
@@ -266,22 +282,23 @@ See [LICENSE](LICENSE.md), [NOTICE.md](NOTICE.md), and the complete texts under 
    - `{"type":"line",...}`：执行循环状态；
    - `{"text":"...","sessionId":...}`：最终权威结果。
 
-bridge 输出最终记录后立即退出。adapter 信任 `item.completed` 的权威快照，因此中间进度文本与最终文本不一致时，也不会让 UI 一直停留在“正在思考”。
+bridge 输出最终记录后立即退出。adapter 保留中间进度 Item，并用 bridge 的最终权威记录创建独立 final Item；因此中间进度文本与最终文本不一致时，也不会让 UI 一直停留在“正在思考”。
 
 ### 仓库结构
 
 - `patches/codex-host/0001-add-hmharness-adapter-and-streaming-bridge.patch`：只包含源码和测试的精选补丁，基准为官方 `main` 提交 `25fb54f2b91f0f4c488051287ffa813513c9a060`，即 [PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243)。
 - `snapshots/codex-host/`：已验证集成中涉及的 CodexHost 源码和测试文件。
 - `snapshots/hmharness/packages/codexhost-bridge/`：adapter 依赖的机器可读 bridge 实现。
-- `snapshots/hmharness/packages/codexhost-bridge-0.23.13/`：与 CodexHost `0.12.0` 一起验证的精确运行时 bridge 源码快照，来源为 HMHarness 提交 `a8025d9ec5511a6297323166e3545e9a561daeef`。
-- `snapshots/codex-host-runtime/0.12.0/plugin/`：独立维护的 CodexHost `0.12.0` 运行时插件包，包含已验证的 HMHarness 图标。
-- `scripts/apply-codexhost-0.12.0.mjs`：面向官方 CodexHost `0.12.0` npm nested Windows 运行时目录结构的精确锚点迁移脚本。
-- `tools/launch-windows-0.12.0.ps1`：当前 CodexHost `0.12.0` Windows fallback 启动器。
+- `snapshots/hmharness/packages/codexhost-bridge-0.23.20/`：与 CodexHost `0.12.1` 一起验证的精确运行时 bridge 源码快照，来源为 HMHarness 提交 `d16bb0d692ffaa838edf2b2f4ac2d8a61e9a7eec`。
+- `snapshots/codex-host-runtime/0.12.1/plugin/`：独立维护的 CodexHost `0.12.1` 运行时插件包，包含已验证的 HMHarness 图标和 textual Item completion 修复。
+- `scripts/apply-codexhost-0.12.1.mjs`：面向官方 CodexHost `0.12.1` npm nested Windows 运行时目录结构的精确锚点迁移脚本。
+- `tools/launch-windows-0.12.1.ps1`：当前 CodexHost `0.12.1` Windows fallback 启动器。
+- `snapshots/hmharness/packages/codexhost-bridge-0.23.13/`、`snapshots/codex-host-runtime/0.12.0/plugin/`、`scripts/apply-codexhost-0.12.0.mjs`、`tools/launch-windows-0.12.0.ps1`：已归档的 CodexHost `0.12.0` 适配组合。
 - `snapshots/codex-host-runtime/0.10.2/plugin/`：已归档的 CodexHost `0.10.2` 运行时插件包。
 - `scripts/apply-codexhost-0.10.2.mjs`：已归档的 CodexHost `0.10.2` 迁移脚本。
 - `tools/launch-windows-0.10.2.ps1`：已归档的 CodexHost `0.10.2` Windows fallback 启动器。
 - `patches/codex-host/windows-0.10.2-launcher-proxy.patch`：让 Chromium 显式使用托管代理、同时保持本地 Host/model 流量仅走 loopback 的 launcher 源码补丁。
-- `tools/cdp-eval.mjs`、`tools/cdp-input-send.mjs`、`tools/cdp-locale.mjs`、`tools/cdp-renderer-diagnose.mjs`：只精确选择 `app://-/index.html` 主 renderer 的 CDP 工具，忽略 Desktop 26.924 的隐藏 avatar-overlay target。
+- `tools/cdp-eval.mjs`、`tools/cdp-main-evaluate.mjs`、`tools/cdp-main-input.mjs`、`tools/cdp-input-send.mjs`、`tools/cdp-locale.mjs`、`tools/cdp-renderer-diagnose.mjs`：只精确选择 `app://-/index.html` 主 renderer 的 CDP 工具，忽略 Desktop 26.924 的隐藏 avatar-overlay target。
 - `snapshots/codex-host-runtime/0.10.1/plugin/`：已归档的 CodexHost `0.10.1` 运行时插件包。
 - `scripts/apply-codexhost-0.10.1.mjs`：已归档的 CodexHost `0.10.1` 迁移脚本。
 - `tools/launch-windows-0.10.1.ps1`：已归档的 CodexHost `0.10.1` Windows fallback 启动器。
@@ -322,31 +339,33 @@ npx vitest run --config tests/vitest.config.js \
   tests/release/production-renderer.test.mjs
 ```
 
-bridge 已在 npm 公开发布为 [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge)。与 CodexHost `0.12.0` 一起真实验证的运行时版本是 `0.23.13`，精确包源码保留在 `snapshots/hmharness/packages/codexhost-bridge-0.23.13/`。原路径 `snapshots/hmharness/packages/codexhost-bridge/` 仍是 HMHarness 干净提交 `b17e02f5c6d654c4a50bbe4c614164167cf9851a` 上的历史 `0.6.5` 来源快照。
+bridge 已在 npm 公开发布为 [`@hmharness/codexhost-bridge`](https://www.npmjs.com/package/@hmharness/codexhost-bridge)。与 CodexHost `0.12.1` 一起真实验证的运行时版本是 `0.23.20`，精确包源码保留在 `snapshots/hmharness/packages/codexhost-bridge-0.23.20/`。原路径 `snapshots/hmharness/packages/codexhost-bridge/` 仍是 HMHarness 干净提交 `b17e02f5c6d654c4a50bbe4c614164167cf9851a` 上的历史 `0.6.5` 来源快照。
 
 不要把同一个 `hmharness` 插件同时留在 npm 管理插件目录和用户插件目录：重复插件 ID 会导致两个插件同时被拒绝。
 
-### 维护 CodexHost 0.12.0 运行时
+### 维护 CodexHost 0.12.1 运行时
 
 CodexHost 官方已明确 HMHarness 不在其路线图内。独立维护的运行时集成应先安装官方宿主，再在每次 CodexHost 更新后应用本地迁移：
 
 ```powershell
-# 先安装官方 CodexHost 0.12.0 发行版。
-npm install -g @codexhost/cli@0.12.0
+# 先安装官方 CodexHost 0.12.1 发行版。
+npm install -g @codexhost/cli@0.12.1
 npm install -g @openai/codex@0.160.0
-npm install -g @hmharness/codexhost-bridge@0.23.13
-node scripts/apply-codexhost-0.12.0.mjs
+npm install -g @hmharness/codexhost-bridge@0.23.20
+node scripts/apply-codexhost-0.12.1.mjs
 pwsh -NoProfile -ExecutionPolicy Bypass -File tools/install-windows.ps1  # Windows 可选独立位置检查
 Get-Content "$env:APPDATA\npm\node_modules\@codexhost\cli\node_modules\@codexhost\cli-win32-x64\app\codexhost-distribution.json"
 ```
 
-0.12.0 迁移脚本保留官方用户插件机制：已验证插件包安装到 `~/.codexhost/plugins/hmharness`，并通过 `~/.codexhost/plugins/enabled.json` 启用。CodexHost `0.12.0` 的 controller/renderer 仍硬编码 Agent 名单，因此本地只按精确锚点补齐 HMHarness 的可见性、模型路由、恢复 ownership、标签、安装链接、transport 路由和专用 SVG 图标。插件 SHA-256 为 `57D1EDD1394F2011B0FF4C88830870FF64C6D4A0A49BFA3BAF0C7094FDA4436A`，图标 SHA-256 为 `950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF`。Windows 位置辅助脚本会校验这两个值，但 controller/renderer 映射仍必需，所以它不是独立迁移方案。
+0.12.1 迁移脚本保留官方用户插件机制：已验证插件包安装到 `~/.codexhost/plugins/hmharness`，并通过 `~/.codexhost/plugins/enabled.json` 启用。CodexHost `0.12.1` 的 controller/renderer 仍硬编码 Agent 名单，因此本地只按精确锚点补齐 HMHarness 的可见性、模型路由、恢复 ownership、标签、安装链接、transport 路由和专用 SVG 图标。插件 SHA-256 为 `877D0A17F9483E8DBA4BE0585BBF9C1EA25F38D8F0432A9B5C4308C7F7DFFF36`，图标 SHA-256 为 `950FA9B06484F9D56C51A976679252D3061832279292658C20E59D9F06FE75DF`。Windows 位置辅助脚本会校验这两个值，但 controller/renderer 映射仍必需，所以它不是独立迁移方案。
+
+CodexHost 0.12.1 会校验 textual Item 的完成文本必须等于此前 `text.append` 累积文本。HMHarness 可能在权威最终记录前输出中间进度，因此插件现在会先按已流式累积的文本关闭中间 Item，再新建第二个 `agentMessage` 承载 bridge 最终文本，并把两个快照一起提交给 `turn.completed`。这样既保留流式进度，也不会触发 Host 的 `Host textual Item completion does not match its append updates` 不变量。
 
 renderer 仍要等远端 Statsig 控制开启 i18n 后才加载语言包，仅给进程加 `--lang=zh-CN` 不足以让可见 UI 切换。迁移因此沿用生产 bundle 的精确起始锚点补丁，只强制 CodexHost 需要的两个 locale gate，其它远端值保持原样。该补丁幂等，只用于补官方远端开关造成的可见中文缺口，不替代官方用户插件装载机制。
 
-当前验证的宿主是 `%APPDATA%\npm\node_modules\@codexhost\cli\node_modules\@codexhost\cli-win32-x64` 下的 npm nested Windows 平台包，版本为 `0.12.0`。PATH 命令和实际 Desktop 宿主仍可能分叉，适配前必须读取 `app\codexhost-distribution.json` 确认宿主版本。0.12.0 launcher 会从 PATH 动态解析 `node.exe` 并要求 Node.js 22 或更高版本，同时使用 `windows-0120-launch-fallback.json` 和带版本的 `env-0120-launch-*` 备份来支持异常退出后的恢复。
+当前验证的宿主是 `%APPDATA%\npm\node_modules\@codexhost\cli\node_modules\@codexhost\cli-win32-x64` 下的 npm nested Windows 平台包，版本为 `0.12.1`。PATH 命令和实际 Desktop 宿主仍可能分叉，适配前必须读取 `app\codexhost-distribution.json` 确认宿主版本。0.12.1 launcher 会从 PATH 动态解析 `node.exe` 并要求 Node.js 22 或更高版本，同时使用 `windows-0121-launch-fallback.json` 和带版本的 `env-0121-launch-*` 备份来支持异常退出后的恢复。
 
-Codex Desktop `26.928.3736.0` 继续使用 `patches/codex-host/windows-0.10.2-launcher-proxy.patch` 引入的托管代理行为：Chromium 收到单一显式代理和 loopback bypass，Host/model 流量仍只走本机。CDP 工具必须精确连接 `app://-/index.html` 主页面；Desktop 还可能暴露 avatar-overlay 隐藏 target，绝不能把 composer 输入发给它。
+Codex Desktop `26.928.4866.0` 继续使用 `patches/codex-host/windows-0.10.2-launcher-proxy.patch` 引入的托管代理行为：Chromium 收到单一显式代理和 loopback bypass，Host/model 流量仍只走本机。CDP 工具必须精确连接 `app://-/index.html` 主页面；Desktop 还可能暴露 avatar-overlay 隐藏 target，绝不能把 composer 输入发给它。
 
 以下为已归档的 CodexHost `0.10.2` 及更早运行时说明。
 
@@ -369,12 +388,20 @@ CodexHost 0.9.1 的位置辅助脚本会移除官方 installer 插件目录里�
 官方提案状态：
 
 - [CodexHost PR #243](https://github.com/BytePioneer-AI/codex-host/pull/243) 基于官方提交 `25fb54f` 的干净分支，但维护者以 HMHarness 当前不在 CodexHost 计划中为由关闭；未留下技术 review 或 CI 反馈。
-- `@hmharness/codexhost-bridge@0.23.13` 已公开发布，非 private，MIT 许可，npm repository directory 指向正确。
-- 当前运行时 bridge 快照来自 HMHarness 提交 `a8025d9ec5511a6297323166e3545e9a561daeef`；PR 时代的历史快照仍来自干净提交 `b17e02f5c6d654c4a50bbe4c614164167cf9851a`。
+- `@hmharness/codexhost-bridge@0.23.20` 已公开发布，非 private，MIT 许可，npm repository directory 指向正确。
+- 当前运行时 bridge 快照来自 HMHarness 提交 `d16bb0d692ffaa838edf2b2f4ac2d8a61e9a7eec`；PR 时代的历史快照仍来自干净提交 `b17e02f5c6d654c4a50bbe4c614164167cf9851a`。
 - PR 已排除本地构建产物、临时脚本、机器路径、凭据和运行状态。
 - 除非 CodexHost 路线图变化，本仓库按独立方案维护。
 
 ### 验证记录
+
+2026-10-04：
+
+- CodexHost `0.12.1`、全局 Codex CLI `0.160.0`、bridge `0.23.20`、Codex Desktop `26.928.4866.0` 均为当前版本；npm 确认 `0.12.1`、`0.160.0`、`0.23.20` 是最新发布版本。
+- 0.12.1 迁移脚本通过 JavaScript 语法检查和重复应用验证，renderer SHA-256 为 `78A834A056EA076C4FBBC84B08A6ABF6E6BB3C1E8D72A417B24A9FAD592ED0B9`，controller SHA-256 为 `A3E8F0624BBC8FF07666C00DA1437A3981ADB41B76817572FD808B6DB8AA53E5`。最终只保留官方用户插件目录一份，插件哈希为 `877D0A17F9483E8DBA4BE0585BBF9C1EA25F38D8F0432A9B5C4308C7F7DFFF36`。
+- 通过 `Desktop\CodexHost.lnk` 冷启动后，本次动态 CDP 端口为 `51130`，HMHarness 为 `ready` 并选中 `glm / glm-5.3`；10 个实页图标节点逐字节匹配，其中 9 个可见。
+- 简短 marker 和原始低 watch 超时委托路径均完成。delegation `45ffb4b9-c041-41af-a46e-bcd4695def7b` 的 Claude Code 子线程 `c5a62f7c-4e0d-4eca-9f0c-6f964d77066d` 为 `completed`，逐字符返回 `HMH_CODEXHOST_0121_MISMATCH_FIX_DELEGATION_20261004_012500`；watch 过期通知又作为父线程新 turn 被处理，父 threadMappings 正常增加。最终“正在思考”和 Stop 均为 `0`，输入框为空，无 bridge 进程残留。
+- bridge `0.23.20` 测试通过 `2/2`，`--version` 返回预期 JSON；npm 发布包的四个载荷文件经行内容比对与本地 bridge 一致，差异仅来自 npm 行尾规范化。
 
 2026-10-03：
 
